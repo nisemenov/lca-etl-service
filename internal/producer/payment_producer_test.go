@@ -14,12 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPaymentProducer_FetchPayments_OK(t *testing.T) {
-	var mthd string
-
+func TestPaymentProducer_Fetch_OK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mthd = r.Method
-
+		require.Equal(t, "GET", r.Method)
 		require.Equal(t, FetchPaymentsPath, r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -42,11 +39,10 @@ func TestPaymentProducer_FetchPayments_OK(t *testing.T) {
 	}))
 	defer server.Close()
 
-	payProducer := getPayProducer(server)
-	payments, err := payProducer.FetchPayments(context.Background())
+	payProducer := getPayProducer(server.URL)
+	payments, err := payProducer.Fetch(context.Background())
 
 	require.NoError(t, err)
-	require.Equal(t, "GET", mthd)
 	require.Len(t, payments, 1)
 
 	first := payments[0]
@@ -55,11 +51,9 @@ func TestPaymentProducer_FetchPayments_OK(t *testing.T) {
 	require.Equal(t, domain.Money(10000), first.Amount)
 }
 
-func TestPaymentProducer_FetchPayments_SkipsInvalid(t *testing.T) {
-	var mthd string
-
+func TestPaymentProducer_Fetch_SkipsInvalid(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mthd = r.Method
+		require.Equal(t, "GET", r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{
@@ -83,21 +77,17 @@ func TestPaymentProducer_FetchPayments_SkipsInvalid(t *testing.T) {
 	}))
 	defer server.Close()
 
-	payProducer := getPayProducer(server)
-	payments, err := payProducer.FetchPayments(context.Background())
+	payProducer := getPayProducer(server.URL)
+	payments, err := payProducer.Fetch(context.Background())
 
 	require.NoError(t, err)
-	require.Equal(t, "GET", mthd)
 	require.Len(t, payments, 1)
 	require.Equal(t, domain.PaymentID(2), payments[0].ID)
 }
 
-func TestPaymentProducer_AckPayments_OK(t *testing.T) {
-	var mthd string
-
+func TestPaymentProducer_Ack_OK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mthd = r.Method
-
+		require.Equal(t, "POST", r.Method)
 		require.Equal(t, AckPaymentsPath, r.URL.Path)
 
 		var body struct {
@@ -109,42 +99,38 @@ func TestPaymentProducer_AckPayments_OK(t *testing.T) {
 	}))
 	defer server.Close()
 
-	payProducer := getPayProducer(server)
-	err := payProducer.AckPayments(context.Background(), []domain.PaymentID{domain.PaymentID(1), domain.PaymentID(2)})
+	payProducer := getPayProducer(server.URL)
+	err := payProducer.Ack(context.Background(), []domain.PaymentID{domain.PaymentID(1), domain.PaymentID(2)})
 
 	require.NoError(t, err)
-	require.Equal(t, "POST", mthd)
 }
 
-func TestPaymentProducer_AckPayments_HTTPError(t *testing.T) {
-	var mthd string
-
+func TestPaymentProducer_Ack_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mthd = r.Method
+		require.Equal(t, "POST", r.Method)
 
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error":"db down"}`))
 	}))
 	defer server.Close()
 
-	payProducer := getPayProducer(server)
-	err := payProducer.AckPayments(context.Background(), []domain.PaymentID{1, 2})
+	payProducer := getPayProducer(server.URL)
+	err := payProducer.Ack(context.Background(), []domain.PaymentID{1, 2})
 
 	require.Error(t, err)
-	require.Equal(t, "POST", mthd)
 }
 
-func TestPaymentProducer_AckPayments_Empty(t *testing.T) {
+func TestPaymentProducer_Ack_Empty(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	payProducer := NewPaymentProducer(nil, logger)
 
-	err := payProducer.AckPayments(context.Background(), nil)
+	err := payProducer.Ack(context.Background(), nil)
 	require.NoError(t, err)
 }
 
-func getPayProducer(server *httptest.Server) PaymentProducer {
-	prod := httpclient.NewHTTPClient(&http.Client{}, server.URL)
+func getPayProducer(baseURL string) paymentProducer {
+	http := httpclient.NewHTTPClient(&http.Client{}, baseURL)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	return NewPaymentProducer(prod, logger)
+	return *NewPaymentProducer(http, logger)
 }

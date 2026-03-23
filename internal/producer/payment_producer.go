@@ -10,17 +10,12 @@ import (
 	"github.com/nisemenov/etl_service/internal/httpclient"
 )
 
-type PaymentProducer interface {
-	FetchPayments(ctx context.Context) ([]domain.Payment, error)
-	AckPayments(ctx context.Context, ids []domain.PaymentID) error
-}
-
 type paymentProducer struct {
 	http   *httpclient.HTTPClient
 	logger *slog.Logger
 }
 
-func (p *paymentProducer) FetchPayments(ctx context.Context) ([]domain.Payment, error) {
+func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 	var resp fetchPaymentsResponse
 
 	err := p.http.Get(ctx, FetchPaymentsPath, &resp)
@@ -32,7 +27,7 @@ func (p *paymentProducer) FetchPayments(ctx context.Context) ([]domain.Payment, 
 		return nil, err
 	}
 
-	// fill output in with validated data
+	// fill in output with validated data
 	response := make([]domain.Payment, 0, len(resp.Data))
 	for _, rawPayment := range resp.Data {
 		if err := rawPayment.Validate(); err != nil {
@@ -66,7 +61,7 @@ func (p *paymentProducer) FetchPayments(ctx context.Context) ([]domain.Payment, 
 	return response, nil
 }
 
-func (p *paymentProducer) AckPayments(ctx context.Context, ids []domain.PaymentID) error {
+func (p *paymentProducer) Ack(ctx context.Context, ids []domain.PaymentID) error {
 	if len(ids) == 0 {
 		p.logger.Warn("empty ids batch for AckPayments")
 		return nil
@@ -89,6 +84,6 @@ func (p *paymentProducer) AckPayments(ctx context.Context, ids []domain.PaymentI
 	return nil
 }
 
-func NewPaymentProducer(http *httpclient.HTTPClient, logger *slog.Logger) PaymentProducer {
+func NewPaymentProducer(http *httpclient.HTTPClient, logger *slog.Logger) *paymentProducer {
 	return &paymentProducer{http: http, logger: logger}
 }

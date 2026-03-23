@@ -28,18 +28,11 @@ type Config struct {
 }
 
 func Load() *Config {
-	dbPath := getEnv("DB_PATH", "")
-	apiBaseURL := getEnv("API_BASE_URL", "")
-
-	xInternalToken := getEnv("X_INTERNAL_TOKEN", "")
-
-	debug := getEnvBool("DEBUG")
-
 	config := &Config{
-		DBPath:         dbPath,
-		APIBaseURL:     apiBaseURL,
-		XInternalToken: xInternalToken,
-		Debug:          debug,
+		DBPath:         getEnv("DB_PATH", ""),
+		APIBaseURL:     getEnv("API_BASE_URL", ""),
+		XInternalToken: getEnv("X_INTERNAL_TOKEN", ""),
+		Debug:          getEnvBool("DEBUG"),
 	}
 
 	if err := validation.Validate.Struct(config); err != nil {

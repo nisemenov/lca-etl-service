@@ -15,11 +15,8 @@ import (
 const testURL = "/test"
 
 func TestHTTPClient_Get_OK(t *testing.T) {
-	var mthd string
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mthd = r.Method
-
+		require.Equal(t, "GET", r.Method)
 		require.Equal(t, testURL, r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -36,7 +33,6 @@ func TestHTTPClient_Get_OK(t *testing.T) {
 	err := p.Get(context.Background(), testURL, &resp)
 	require.NoError(t, err)
 	require.Equal(t, 42, resp.Value)
-	require.Equal(t, "GET", mthd)
 }
 
 func TestHTTPClient_Get_ErrorStatus(t *testing.T) {
@@ -54,11 +50,8 @@ func TestHTTPClient_Get_ErrorStatus(t *testing.T) {
 }
 
 func TestHTTPClient_PostRaw(t *testing.T) {
-	var mthd string
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mthd = r.Method
-
+		require.Equal(t, "POST", r.Method)
 		require.Equal(t, testURL, r.URL.Path)
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
@@ -75,15 +68,11 @@ func TestHTTPClient_PostRaw(t *testing.T) {
 
 	err := p.PostRaw(context.Background(), testURL, "application/json", bytes.NewReader(b))
 	require.NoError(t, err)
-	require.Equal(t, "POST", mthd)
 }
 
 func TestHTTPClient_Post(t *testing.T) {
-	var mthd string
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mthd = r.Method
-
+		require.Equal(t, "POST", r.Method)
 		require.Equal(t, testURL, r.URL.Path)
 
 		var body map[string]int
@@ -97,7 +86,6 @@ func TestHTTPClient_Post(t *testing.T) {
 
 	err := p.Post(context.Background(), testURL, map[string]int{"id": 123})
 	require.NoError(t, err)
-	require.Equal(t, "POST", mthd)
 }
 
 func TestHTTPClient_Timeout(t *testing.T) {

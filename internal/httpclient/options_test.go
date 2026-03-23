@@ -11,10 +11,8 @@ import (
 )
 
 func TestHTTPClient_WithHeaders(t *testing.T) {
-	var header string
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		header = r.Header.Get("testHeader")
+		require.Equal(t, "test_header", r.Header.Get("testHeader"))
 	}))
 	defer server.Close()
 
@@ -24,7 +22,6 @@ func TestHTTPClient_WithHeaders(t *testing.T) {
 	err := p.Get(context.Background(), testURL, &out)
 
 	require.Error(t, err)
-	require.Equal(t, "test_header", header)
 }
 
 func TestHTTPClient_BasicAuth(t *testing.T) {

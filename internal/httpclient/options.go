@@ -19,6 +19,8 @@ func WithHeaders(headers map[string]string) Option {
 // WithMiddleware modifies HTTPClient.middleware during NewHTTPClient calling.
 // Without error handling so far.
 //
+// Only one Middleware!
+//
 // usage: prod := NewHTTPClient(client, baseURL, WithMiddleware(...))
 func WithMiddleware(mw func(*http.Request)) Option {
 	return func(p *HTTPClient) {

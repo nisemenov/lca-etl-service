@@ -85,22 +85,69 @@ func TestPaymentProducer_Fetch_SkipsInvalid(t *testing.T) {
 	require.Equal(t, domain.PaymentID(2), payments[0].ID)
 }
 
+func TestPaymentProducer_Fetch_AllInvalid(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"data": [
+				{"id": 1},
+				{"id": 2},
+				{"id": 3}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	payProducer := getPayProducer(server.URL)
+	payments, err := payProducer.Fetch(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, payments, 0)
+}
+
+func TestPaymentProducer_Fetch_EmptyResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data": []}`))
+	}))
+	defer server.Close()
+
+	payProducer := getPayProducer(server.URL)
+	payments, err := payProducer.Fetch(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, payments, 0)
+}
+
+func TestPaymentProducer_Fetch_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data": [{"id": 1`))
+	}))
+	defer server.Close()
+
+	payProducer := getPayProducer(server.URL)
+	_, err := payProducer.Fetch(context.Background())
+
+	require.Error(t, err)
+}
+
 func TestPaymentProducer_Ack_OK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "POST", r.Method)
 		require.Equal(t, AckPaymentsPath, r.URL.Path)
 
 		var body struct {
-			IDs []int64 `json:"ids"`
+			IDs []int `json:"ids"`
 		}
 		err := json.NewDecoder(r.Body).Decode(&body)
 		require.NoError(t, err)
-		require.Equal(t, []int64{1, 2}, body.IDs)
+		require.Equal(t, []int{1, 2}, body.IDs)
 	}))
 	defer server.Close()
 
 	payProducer := getPayProducer(server.URL)
-	err := payProducer.Ack(context.Background(), []domain.PaymentID{domain.PaymentID(1), domain.PaymentID(2)})
+	err := payProducer.Ack(context.Background(), []domain.PaymentID{1, 2})
 
 	require.NoError(t, err)
 }

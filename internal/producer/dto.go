@@ -28,3 +28,7 @@ func (p *paymentDTO) Validate() error {
 type fetchPaymentsResponse struct {
 	Data []paymentDTO `json:"data"`
 }
+
+type ackPaymentRequest struct {
+	IDs []domain.PaymentID `json:"ids"`
+}

@@ -33,6 +33,7 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 		if err := rawPayment.Validate(); err != nil {
 			p.logger.Warn(
 				"failed to validate raw payment data",
+				"id", rawPayment.ID,
 				"err", err,
 			)
 			continue
@@ -67,13 +68,7 @@ func (p *paymentProducer) Ack(ctx context.Context, ids []domain.PaymentID) error
 		return nil
 	}
 
-	payload := struct {
-		IDs []domain.PaymentID `json:"ids"`
-	}{
-		IDs: ids,
-	}
-
-	err := p.http.Post(ctx, AckPaymentsPath, payload)
+	err := p.http.Post(ctx, AckPaymentsPath, ackPaymentRequest{IDs: ids})
 	if err != nil {
 		p.logger.Error(
 			"failed to insert payment ids into prod service",

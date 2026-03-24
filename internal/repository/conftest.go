@@ -2,6 +2,8 @@ package repository
 
 import (
 	"database/sql"
+	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/nisemenov/etl_service/internal/storage/sqlite"
@@ -24,8 +26,10 @@ func NewTestSQLiteDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func NewTestSQLitePaymentRepo(t *testing.T) *SQLitePaymentRepo {
+func NewTestSQLitePaymentRepo(t *testing.T) *sqlitePaymentRepo {
 	db := NewTestSQLiteDB(t)
-	repo := NewSQLitePaymentRepo(db)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	repo := NewSQLitePaymentRepo(db, logger)
 	return repo
 }

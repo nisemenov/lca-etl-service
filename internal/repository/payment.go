@@ -6,27 +6,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/nisemenov/etl_service/internal/domain"
 )
 
-type PaymentRepository interface {
-	SaveBatch(ctx context.Context, payments []domain.Payment) error
-	FetchForProcessing(ctx context.Context, limit int) ([]domain.Payment, error)
-	MarkSent(ctx context.Context, ids []domain.PaymentID) error
+type sqlitePaymentRepo struct {
+	db     *sql.DB
+	logger *slog.Logger
 }
 
-type SQLitePaymentRepo struct {
-	db *sql.DB
-}
-
-func NewSQLitePaymentRepo(db *sql.DB) *SQLitePaymentRepo {
-	return &SQLitePaymentRepo{db: db}
-}
-
-func (r *SQLitePaymentRepo) SaveBatch(ctx context.Context, payments []domain.Payment) error {
+func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, payments []domain.Payment) error {
 	if len(payments) == 0 {
+		r.logger.Warn("empty payments batch for SaveBatch")
+
 		return nil
 	}
 
@@ -81,7 +75,7 @@ func (r *SQLitePaymentRepo) SaveBatch(ctx context.Context, payments []domain.Pay
 	return tx.Commit()
 }
 
-func (r *SQLitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) ([]domain.Payment, error) {
+func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) ([]domain.Payment, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -99,7 +93,7 @@ func (r *SQLitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 	}
 	defer rows.Close()
 
-	var ids []domain.PaymentID
+	ids := make([]domain.PaymentID, 0, limit)
 	for rows.Next() {
 		var id domain.PaymentID
 		if err := rows.Scan(&id); err != nil {
@@ -109,6 +103,8 @@ func (r *SQLitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 	}
 
 	if len(ids) == 0 {
+		r.logger.Warn("empty payments batch for FetchForProcessing")
+
 		return nil, nil
 	}
 
@@ -131,7 +127,7 @@ func (r *SQLitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 	return payments, nil
 }
 
-func (r *SQLitePaymentRepo) MarkSent(ctx context.Context, ids []domain.PaymentID) error {
+func (r *sqlitePaymentRepo) MarkSent(ctx context.Context, ids []domain.PaymentID) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -145,7 +141,7 @@ func (r *SQLitePaymentRepo) MarkSent(ctx context.Context, ids []domain.PaymentID
 	return tx.Commit()
 }
 
-func (r *SQLitePaymentRepo) markStatusTx(
+func (r *sqlitePaymentRepo) markStatusTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	ids []domain.PaymentID,
@@ -170,7 +166,7 @@ func (r *SQLitePaymentRepo) markStatusTx(
 	return err
 }
 
-func (r *SQLitePaymentRepo) fetchNewPayments(ctx context.Context, limit int) ([]domain.Payment, error) {
+func (r *sqlitePaymentRepo) fetchNewPayments(ctx context.Context, limit int) ([]domain.Payment, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT 
 			id,
@@ -224,4 +220,8 @@ func scanPayments(rows *sql.Rows) ([]domain.Payment, error) {
 		payments = append(payments, p)
 	}
 	return payments, rows.Err()
+}
+
+func NewSQLitePaymentRepo(db *sql.DB, logger *slog.Logger) *sqlitePaymentRepo {
+	return &sqlitePaymentRepo{db: db, logger: logger}
 }

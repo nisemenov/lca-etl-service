@@ -13,19 +13,15 @@ import (
 	"github.com/nisemenov/etl_service/internal/httpclient"
 )
 
-type ClickHouseLoader interface {
-	InsertBatch(ctx context.Context, payments []domain.Payment) error
-}
-
-type HTTPClickHouse struct {
+type clickHouseLoader struct {
 	http   *httpclient.HTTPClient
 	table  string
 	logger *slog.Logger
 }
 
-func (c *HTTPClickHouse) InsertBatch(ctx context.Context, payments []domain.Payment) error {
+func (c *clickHouseLoader) InsertBatch(ctx context.Context, payments []domain.Payment) error {
 	if len(payments) == 0 {
-		c.logger.Warn("empty payments batch for clickhouse InsertBatch")
+		c.logger.Warn("empty payments batch for CH InsertBatch")
 		return nil
 	}
 
@@ -49,15 +45,17 @@ func (c *HTTPClickHouse) InsertBatch(ctx context.Context, payments []domain.Paym
 	err := c.http.PostRaw(ctx, query, "application/json", &buf)
 	if err != nil {
 		c.logger.Error(
-			"failed to insert into clickhouse",
+			"CH InsertBatch failed",
+			"table", c.table,
+			"batch_size", len(payments),
 			"err", err,
 		)
-		return err
+		return fmt.Errorf("CH InsertBatch failed: %w", err)
 	}
 	return nil
 }
 
-func (c *HTTPClickHouse) paymentToClickHouseRow(payment domain.Payment) ([]byte, error) {
+func (c *clickHouseLoader) paymentToClickHouseRow(payment domain.Payment) ([]byte, error) {
 	row := map[string]any{
 		"id":                       payment.ID,
 		"case_id":                  payment.CaseID,
@@ -76,6 +74,6 @@ func (c *HTTPClickHouse) paymentToClickHouseRow(payment domain.Payment) ([]byte,
 	return json.Marshal(row)
 }
 
-func NewHTTPClickHouseLoader(http *httpclient.HTTPClient, table string, logger *slog.Logger) *HTTPClickHouse {
-	return &HTTPClickHouse{http: http, table: table, logger: logger}
+func NewClickHouseLoader(http *httpclient.HTTPClient, table string, logger *slog.Logger) *clickHouseLoader {
+	return &clickHouseLoader{http: http, table: table, logger: logger}
 }

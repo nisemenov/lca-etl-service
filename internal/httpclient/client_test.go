@@ -37,7 +37,7 @@ func TestHTTPClient_Get_OK(t *testing.T) {
 
 func TestHTTPClient_Get_ErrorStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
 

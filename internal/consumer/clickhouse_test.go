@@ -1,12 +1,14 @@
 package consumer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -17,7 +19,7 @@ import (
 
 func TestClickHouseLoader_InsertBatch_OK(t *testing.T) {
 	var req *http.Request
-	receivedBody := make([]byte, 0)
+	var receivedBody []byte
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req = r
@@ -30,10 +32,9 @@ func TestClickHouseLoader_InsertBatch_OK(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &http.Client{}
-	httpClient := httpclient.NewHTTPClient(client, server.URL)
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	loader := NewHTTPClickHouseLoader(httpClient, "payments", logger)
+	httpClient := httpclient.NewHTTPClient(&http.Client{}, server.URL)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	loader := NewClickHouseLoader(httpClient, "payments", logger)
 
 	payments := []domain.Payment{
 		{ID: 1, FullName: "Ivan", Amount: domain.Money(10000)},
@@ -58,4 +59,30 @@ func TestClickHouseLoader_InsertBatch_OK(t *testing.T) {
 	require.Equal(t, float64(2), r2["id"])
 	require.Equal(t, "Petr", r2["full_name"])
 	require.Equal(t, float64(200), r2["amount"])
+}
+
+func TestClickHouseLoader_InsertBatch_Empty(t *testing.T) {
+	buf := &bytes.Buffer{}
+	logger := slog.New(slog.NewTextHandler(buf, nil))
+	loader := NewClickHouseLoader(nil, "", logger)
+
+	err := loader.InsertBatch(context.Background(), nil)
+	require.NoError(t, err)
+	require.Contains(t, buf.String(), "empty payments batch for CH InsertBatch")
+}
+
+func TestClickHouseLoader_InsertBatch_HTTPError(t *testing.T){
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	var buf bytes.Buffer
+	httpClient := httpclient.NewHTTPClient(&http.Client{}, server.URL)
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	loader := NewClickHouseLoader(httpClient, "payments", logger)
+
+	err := loader.InsertBatch(context.Background(), []domain.Payment{{ID: domain.PaymentID(1)}})
+	require.Error(t, err)
+	require.Contains(t, buf.String(), "CH InsertBatch failed")
 }

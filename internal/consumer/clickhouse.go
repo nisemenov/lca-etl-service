@@ -19,15 +19,15 @@ type clickHouseLoader struct {
 	logger *slog.Logger
 }
 
-func (c *clickHouseLoader) InsertBatch(ctx context.Context, payments []domain.Payment) error {
-	if len(payments) == 0 {
+func (c *clickHouseLoader) InsertBatch(ctx context.Context, batch []domain.Payment) error {
+	if len(batch) == 0 {
 		c.logger.Warn("empty payments batch for CH InsertBatch")
 		return nil
 	}
 
 	var buf bytes.Buffer
 
-	for _, p := range payments {
+	for _, p := range batch {
 		row, err := c.paymentToClickHouseRow(p)
 		if err != nil {
 			c.logger.Warn(
@@ -47,7 +47,7 @@ func (c *clickHouseLoader) InsertBatch(ctx context.Context, payments []domain.Pa
 		c.logger.Error(
 			"CH InsertBatch failed",
 			"table", c.table,
-			"batch_size", len(payments),
+			"batch_size", len(batch),
 			"err", err,
 		)
 		return fmt.Errorf("CH InsertBatch failed: %w", err)

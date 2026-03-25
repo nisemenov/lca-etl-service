@@ -17,8 +17,8 @@ type sqlitePaymentRepo struct {
 	logger *slog.Logger
 }
 
-func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, payments []domain.Payment) error {
-	if len(payments) == 0 {
+func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Payment) error {
+	if len(batch) == 0 {
 		r.logger.Warn("empty payments batch for SaveBatch")
 
 		return nil
@@ -53,7 +53,7 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, payments []domain.Pay
 	}
 	defer stmt.Close()
 
-	for _, p := range payments {
+	for _, p := range batch {
 		_, err := stmt.ExecContext(ctx,
 			p.ID,
 			p.CaseID,

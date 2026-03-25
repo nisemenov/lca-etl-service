@@ -175,9 +175,9 @@ func TestPaymentProducer_Ack_Empty(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func getPayProducer(baseURL string) paymentProducer {
+func getPayProducer(baseURL string) *paymentProducer {
 	http := httpclient.NewHTTPClient(&http.Client{}, baseURL)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	return *NewPaymentProducer(http, logger)
+	return NewPaymentProducer(http, logger)
 }

@@ -75,56 +75,47 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 	return tx.Commit()
 }
 
-func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) ([]domain.Payment, error) {
+// FetchForProcessing меняет статусы в бд на StatusProcessing;
+// возвращает батч со status == StatusNew, потому что в CH они не вставляются
+func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) ([]domain.PaymentID, []domain.Payment, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer tx.Rollback()
 
-	rows, err := tx.QueryContext(ctx, `
-		SELECT id
-        FROM payments
-        WHERE status = ?
-        LIMIT ?
-    `, domain.StatusNew, limit)
+	payments, err := r.fetchPaymentsOnStatus(ctx, tx, domain.StatusNew, limit)
 	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	ids := make([]domain.PaymentID, 0, limit)
-	for rows.Next() {
-		var id domain.PaymentID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
+		return nil, nil, err
 	}
 
-	if len(ids) == 0 {
+	if len(payments) == 0 {
 		r.logger.Warn("empty payments batch for FetchForProcessing")
+		return nil, nil, nil
+	}
 
-		return nil, nil
+	ids := make([]domain.PaymentID, 0, len(payments))
+	for _, p := range payments {
+		ids = append(ids, p.ID)
 	}
 
 	if err := r.markStatusTx(ctx, tx, ids, domain.StatusProcessing); err != nil {
-		return nil, err
-	}
-
-	payments := make([]domain.Payment, 0, len(ids))
-	for _, id := range ids {
-		payments = append(payments, domain.Payment{
-			ID:     id,
-			Status: domain.StatusProcessing,
-		})
+		return nil, nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return payments, nil
+	return ids, payments, nil
+}
+
+// retry logic
+func (r *sqlitePaymentRepo) FetchProcessed(
+	ctx context.Context,
+	limit int,
+) ([]domain.PaymentID, []domain.Payment, error) {
+	return nil, nil, nil
 }
 
 func (r *sqlitePaymentRepo) MarkSent(ctx context.Context, ids []domain.PaymentID) error {
@@ -135,6 +126,20 @@ func (r *sqlitePaymentRepo) MarkSent(ctx context.Context, ids []domain.PaymentID
 	defer tx.Rollback()
 
 	if err := r.markStatusTx(ctx, tx, ids, domain.StatusExported); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *sqlitePaymentRepo) MarkFailed(ctx context.Context, ids []domain.PaymentID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := r.markStatusTx(ctx, tx, ids, domain.StatusFailed); err != nil {
 		return err
 	}
 
@@ -166,8 +171,13 @@ func (r *sqlitePaymentRepo) markStatusTx(
 	return err
 }
 
-func (r *sqlitePaymentRepo) fetchNewPayments(ctx context.Context, limit int) ([]domain.Payment, error) {
-	rows, err := r.db.QueryContext(ctx, `
+func (r *sqlitePaymentRepo) fetchPaymentsOnStatus(
+	ctx context.Context,
+	tx *sql.Tx,
+	status domain.PaymentStatus,
+	limit int,
+) ([]domain.Payment, error) {
+	rows, err := tx.QueryContext(ctx, `
 		SELECT 
 			id,
 			case_id,
@@ -186,7 +196,7 @@ func (r *sqlitePaymentRepo) fetchNewPayments(ctx context.Context, limit int) ([]
         WHERE status = ?
         ORDER BY created_at ASC
         LIMIT ?
-	`, domain.StatusNew, limit)
+	`, status, limit)
 	if err != nil {
 		return nil, err
 	}

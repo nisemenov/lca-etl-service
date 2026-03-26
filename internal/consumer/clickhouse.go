@@ -67,7 +67,6 @@ func (c *clickHouseLoader) paymentToClickHouseRow(payment domain.Payment) ([]byt
 		"debt_amount":              payment.DebtAmount.Float64(),
 		"execution_date_by_system": payment.ExecutionDateBySystem,
 		"channel":                  payment.Channel,
-		"status":                   payment.Status,
 		"created_at":               payment.CreatedAt,
 		"updated_at":               payment.UpdatedAt,
 	}

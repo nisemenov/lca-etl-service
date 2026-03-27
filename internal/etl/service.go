@@ -15,7 +15,26 @@ type etlPipline[D any, ID comparable] struct {
 	logger   *slog.Logger
 }
 
-func (etl *etlPipline[D, ID]) FetchAndSave(ctx context.Context) error {
+func (etl *etlPipline[D, ID]) Run(ctx context.Context) error {
+	if err := etl.Fetch(ctx); err != nil {
+		etl.logger.Error("fetch stage failed", "err", err)
+		return err
+	}
+
+	if err := etl.Process(ctx); err != nil {
+		etl.logger.Error("process stage failed", "err", err)
+		return err
+	}
+
+	if err := etl.Acknowledge(ctx); err != nil {
+		etl.logger.Error("ack stage failed", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+func (etl *etlPipline[D, ID]) Fetch(ctx context.Context) error {
 	instances, err := etl.producer.Fetch(ctx)
 	if err != nil {
 		return fmt.Errorf("producer fetch failed: %w", err)
@@ -34,7 +53,7 @@ func (etl *etlPipline[D, ID]) FetchAndSave(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipline[D, ID]) ProcessAndSend(ctx context.Context) error {
+func (etl *etlPipline[D, ID]) Process(ctx context.Context) error {
 	ids, instances, err := etl.repo.FetchForProcessing(ctx, 500)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
@@ -63,42 +82,27 @@ func (etl *etlPipline[D, ID]) ProcessAndSend(ctx context.Context) error {
 }
 
 func (etl *etlPipline[D, ID]) Acknowledge(ctx context.Context) error {
-	// ids, _, err := etl.repo.FetchForProcessing(ctx, 100)
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// if len(data) == 0 {
-	// 	return nil
-	// }
-	//
-	// var ids []ID
-	// for _, d := range data {
-	// 	ids = append(ids, d.ID)
-	// }
-	//
-	// return etl.repo.MarkStatus(ctx, ids)
+	ids, err := etl.repo.FetchSentIds(ctx, 100)
+	if err != nil {
+		return fmt.Errorf("repository fetch failed: %w", err)
+	}
+
+	if len(ids) == 0 {
+		etl.logger.Warn("no instances to acknowledge")
+		return nil
+	}
+
+	if err = etl.producer.Acknowledge(ctx, ids); err != nil {
+		return fmt.Errorf("payment acknowledge failed: %w", err)
+	}
+
+	if err := etl.repo.MarkStatus(ctx, ids, StatusExported); err != nil {
+		return fmt.Errorf("mark exported failed: %w", err)
+	}
+
+	etl.logger.Info("payments acknowledged successfully", "count", len(ids))
 	return nil
 }
-
-// func (etl *etlPipline[D, ID]) Run(ctx context.Context) error {
-// 	if err := etl.FetchAndSave(ctx); err != nil {
-// 		p.logger.Error("fetch stage failed", "err", err)
-// 		return err
-// 	}
-//
-// 	if err := etl.ProcessAndSend(ctx); err != nil {
-// 		p.logger.Error("process stage failed", "err", err)
-// 		return err
-// 	}
-//
-// 	if err := etl.Acknowledge(ctx); err != nil {
-// 		p.logger.Error("ack stage failed", "err", err)
-// 		return err
-// 	}
-//
-// 	return nil
-// }
 
 func NewETLPipline[D any, ID comparable](
 	producer Producer[D, ID],

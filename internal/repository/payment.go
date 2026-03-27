@@ -111,6 +111,30 @@ func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 	return ids, payments, nil
 }
 
+func (r *sqlitePaymentRepo) FetchSentIds(ctx context.Context, limit int) ([]domain.PaymentID, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusSent, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(payments) == 0 {
+		r.logger.Warn("empty payments batch for FetchForProcessing")
+		return nil, nil
+	}
+
+	ids := make([]domain.PaymentID, 0, len(payments))
+	for _, p := range payments {
+		ids = append(ids, p.ID)
+	}
+	return ids, nil
+}
+
 // retry logic
 func (r *sqlitePaymentRepo) FetchProcessed(
 	ctx context.Context,

@@ -6,13 +6,14 @@ import (
 
 type Producer[D any, ID comparable] interface {
 	Fetch(ctx context.Context) ([]D, error)
-	Ack(ctx context.Context, ids []ID) error
+	Acknowledge(ctx context.Context, ids []ID) error
 }
 
 type Repository[D any, ID comparable] interface {
 	SaveBatch(ctx context.Context, batch []D) error
 	FetchForProcessing(ctx context.Context, limit int) ([]ID, []D, error)
 	FetchProcessed(ctx context.Context, limit int) ([]ID, []D, error)
+	FetchSentIds(ctx context.Context, limit int) ([]ID, error)
 	MarkStatus(ctx context.Context, ids []ID, status EtlStatus) error
 }
 

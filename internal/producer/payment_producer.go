@@ -62,9 +62,9 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 	return response, nil
 }
 
-func (p *paymentProducer) Ack(ctx context.Context, ids []domain.PaymentID) error {
+func (p *paymentProducer) Acknowledge(ctx context.Context, ids []domain.PaymentID) error {
 	if len(ids) == 0 {
-		p.logger.Warn("empty ids batch for AckPayments")
+		p.logger.Warn("empty ids batch for AcknowledgePayments")
 		return nil
 	}
 

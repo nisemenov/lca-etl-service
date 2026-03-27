@@ -5,21 +5,24 @@ import (
 )
 
 type mockProducer struct {
-	batch []string
-	err   error
+	batch  []string
+	ackIds []int
+	err    error
 }
 
 func (p *mockProducer) Fetch(ctx context.Context) ([]string, error) {
 	return p.batch, p.err
 }
 
-func (p *mockProducer) Ack(ctx context.Context, ids []int) error {
+func (p *mockProducer) Acknowledge(ctx context.Context, ids []int) error {
+	p.ackIds = ids
 	return p.err
 }
 
 type mockRepo struct {
 	batch     []string
 	newIds    []int
+	sentIds   []int
 	etlStatus EtlStatus
 	err       error
 }
@@ -31,6 +34,10 @@ func (r *mockRepo) SaveBatch(ctx context.Context, batch []string) error {
 
 func (r *mockRepo) FetchForProcessing(ctx context.Context, limit int) ([]int, []string, error) {
 	return r.newIds, r.batch, r.err
+}
+
+func (r *mockRepo) FetchSentIds(ctx context.Context, limit int) ([]int, error) {
+	return r.sentIds, nil
 }
 
 func (r *mockRepo) FetchProcessed(ctx context.Context, limit int) ([]int, []string, error) {

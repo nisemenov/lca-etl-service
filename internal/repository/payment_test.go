@@ -49,7 +49,7 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
 
-	repo.SaveBatch(ctx, []domain.Payment{{
+	err := repo.SaveBatch(ctx, []domain.Payment{{
 		ID:                    1,
 		CaseID:                1,
 		DebtorID:              1,
@@ -60,8 +60,8 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 		DebtAmount:            domain.Money(1),
 		ExecutionDateBySystem: time.Now(),
 		Channel:               "sms",
-		Status:                etl.StatusNew,
 	}})
+	require.NoError(t, err)
 
 	_, payments, err := repo.FetchForProcessing(ctx, 10)
 	require.NoError(t, err)
@@ -74,6 +74,19 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 
 	_, err = repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusProcessing, 10)
 	require.NoError(t, err)
+}
+
+func TestPaymentRepo_FetchSentIds(t *testing.T) {
+	ctx := context.Background()
+	repo := NewTestSQLitePaymentRepo(t)
+
+	err := savePaymentBatch(ctx, repo, []domain.Payment{{ID: 1, Status: etl.StatusSent}})
+	require.NoError(t, err)
+
+	ids, err := repo.FetchSentIds(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, ids, 1)
+	require.Equal(t, domain.PaymentID(1), ids[0])
 }
 
 func TestPaymentRepo_FetchForProcessing_Atomic(t *testing.T) {

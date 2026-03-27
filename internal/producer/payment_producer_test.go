@@ -3,11 +3,10 @@ package producer
 import (
 	"context"
 	"encoding/json"
-	// "io"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/nisemenov/etl_service/internal/domain"
@@ -133,7 +132,7 @@ func TestPaymentProducer_Fetch_InvalidJSON(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestPaymentProducer_Ack_OK(t *testing.T) {
+func TestPaymentProducer_Acknowledge_OK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "POST", r.Method)
 		require.Equal(t, AckPaymentsPath, r.URL.Path)
@@ -148,12 +147,11 @@ func TestPaymentProducer_Ack_OK(t *testing.T) {
 	defer server.Close()
 
 	payProducer := getPayProducer(server.URL)
-	err := payProducer.Ack(context.Background(), []domain.PaymentID{1, 2})
-
+	err := payProducer.Acknowledge(context.Background(), []domain.PaymentID{1, 2})
 	require.NoError(t, err)
 }
 
-func TestPaymentProducer_Ack_HTTPError(t *testing.T) {
+func TestPaymentProducer_Acknowledge_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "POST", r.Method)
 
@@ -163,22 +161,22 @@ func TestPaymentProducer_Ack_HTTPError(t *testing.T) {
 	defer server.Close()
 
 	payProducer := getPayProducer(server.URL)
-	err := payProducer.Ack(context.Background(), []domain.PaymentID{1, 2})
+	err := payProducer.Acknowledge(context.Background(), []domain.PaymentID{1, 2})
 
 	require.Error(t, err)
 }
 
-func TestPaymentProducer_Ack_Empty(t *testing.T) {
+func TestPaymentProducer_Acknowledge_Empty(t *testing.T) {
 	payProducer := getPayProducer("")
 
-	err := payProducer.Ack(context.Background(), nil)
+	err := payProducer.Acknowledge(context.Background(), nil)
 	require.NoError(t, err)
 }
 
 func getPayProducer(baseURL string) *paymentProducer {
 	http := httpclient.NewHTTPClient(&http.Client{}, baseURL)
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	// logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	// logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	return NewPaymentProducer(http, logger)
 }

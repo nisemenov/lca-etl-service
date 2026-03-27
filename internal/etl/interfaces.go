@@ -13,8 +13,7 @@ type Repository[D any, ID comparable] interface {
 	SaveBatch(ctx context.Context, batch []D) error
 	FetchForProcessing(ctx context.Context, limit int) ([]ID, []D, error)
 	FetchProcessed(ctx context.Context, limit int) ([]ID, []D, error)
-	MarkSent(ctx context.Context, ids []ID) error
-	MarkFailed(ctx context.Context, ids []ID) error
+	MarkStatus(ctx context.Context, ids []ID, status EtlStatus) error
 }
 
 type Consumer[D any] interface {

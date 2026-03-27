@@ -46,7 +46,7 @@ func (etl *etlPipline[D, ID]) ProcessAndSend(ctx context.Context) error {
 	}
 
 	if err := etl.consumer.InsertBatch(ctx, instances); err != nil {
-		if err2 := etl.repo.MarkFailed(ctx, ids); err2 != nil {
+		if err2 := etl.repo.MarkStatus(ctx, ids, StatusFailed); err2 != nil {
 			etl.logger.Error("failed to mark instances as failed", "err", err2)
 		} else {
 			etl.logger.Warn("batch marked as failed", "ids", ids)
@@ -54,7 +54,7 @@ func (etl *etlPipline[D, ID]) ProcessAndSend(ctx context.Context) error {
 		return fmt.Errorf("clickhouse insert failed: %w", err)
 	}
 
-	if err := etl.repo.MarkSent(ctx, ids); err != nil {
+	if err := etl.repo.MarkStatus(ctx, ids, StatusSent); err != nil {
 		return fmt.Errorf("mark sent failed: %w", err)
 	}
 
@@ -62,23 +62,24 @@ func (etl *etlPipline[D, ID]) ProcessAndSend(ctx context.Context) error {
 	return nil
 }
 
-// func (etl *etlPipline[D, ID]) Acknowledge(ctx context.Context) error {
-// 	ids, _, err := etl.repo.FetchForProcessing(ctx, 100)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	if len(data) == 0 {
-// 		return nil
-// 	}
-//
-// 	var ids []ID
-// 	for _, d := range data {
-// 		ids = append(ids, d.ID)
-// 	}
-//
-// 	return etl.repo.MarkSent(ctx, ids)
-// }
+func (etl *etlPipline[D, ID]) Acknowledge(ctx context.Context) error {
+	// ids, _, err := etl.repo.FetchForProcessing(ctx, 100)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// if len(data) == 0 {
+	// 	return nil
+	// }
+	//
+	// var ids []ID
+	// for _, d := range data {
+	// 	ids = append(ids, d.ID)
+	// }
+	//
+	// return etl.repo.MarkStatus(ctx, ids)
+	return nil
+}
 
 // func (etl *etlPipline[D, ID]) Run(ctx context.Context) error {
 // 	if err := etl.FetchAndSave(ctx); err != nil {

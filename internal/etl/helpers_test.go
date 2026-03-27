@@ -20,8 +20,7 @@ func (p *mockProducer) Ack(ctx context.Context, ids []int) error {
 type mockRepo struct {
 	batch     []string
 	newIds    []int
-	sentIds   []int
-	failedIds []int
+	etlStatus EtlStatus
 	err       error
 }
 
@@ -38,13 +37,8 @@ func (r *mockRepo) FetchProcessed(ctx context.Context, limit int) ([]int, []stri
 	return nil, nil, nil
 }
 
-func (r *mockRepo) MarkSent(ctx context.Context, ids []int) error {
-	r.sentIds = r.newIds
-	return r.err
-}
-
-func (r *mockRepo) MarkFailed(ctx context.Context, ids []int) error {
-	r.failedIds = r.newIds
+func (r *mockRepo) MarkStatus(ctx context.Context, ids []int, status EtlStatus) error {
+	r.etlStatus = status
 	return r.err
 }
 
@@ -54,7 +48,7 @@ type mockConsumer struct {
 }
 
 func (c *mockConsumer) InsertBatch(ctx context.Context, batch []string) error {
-	if c.err != nil {
+	if c.err == nil {
 		c.insertedBatch = batch
 	}
 	return c.err

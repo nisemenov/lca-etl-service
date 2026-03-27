@@ -3,10 +3,11 @@ package producer
 import (
 	"context"
 	"encoding/json"
-	"io"
+	// "io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/nisemenov/etl_service/internal/domain"
@@ -168,8 +169,7 @@ func TestPaymentProducer_Ack_HTTPError(t *testing.T) {
 }
 
 func TestPaymentProducer_Ack_Empty(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	payProducer := NewPaymentProducer(nil, logger)
+	payProducer := getPayProducer("")
 
 	err := payProducer.Ack(context.Background(), nil)
 	require.NoError(t, err)
@@ -177,7 +177,8 @@ func TestPaymentProducer_Ack_Empty(t *testing.T) {
 
 func getPayProducer(baseURL string) *paymentProducer {
 	http := httpclient.NewHTTPClient(&http.Client{}, baseURL)
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	// logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	return NewPaymentProducer(http, logger)
 }

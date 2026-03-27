@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/nisemenov/etl_service/internal/domain"
+	"github.com/nisemenov/etl_service/internal/etl"
 )
 
 type sqlitePaymentRepo struct {
@@ -65,7 +66,7 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 			p.DebtAmount,
 			p.ExecutionDateBySystem,
 			p.Channel,
-			domain.StatusNew,
+			etl.StatusNew,
 		)
 		if err != nil {
 			return fmt.Errorf("insert payment %d: %w", p.ID, err)
@@ -84,7 +85,7 @@ func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 	}
 	defer tx.Rollback()
 
-	payments, err := r.fetchPaymentsOnStatus(ctx, tx, domain.StatusNew, limit)
+	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew, limit)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -99,7 +100,7 @@ func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 		ids = append(ids, p.ID)
 	}
 
-	if err := r.markStatusTx(ctx, tx, ids, domain.StatusProcessing); err != nil {
+	if err := r.markStatusTx(ctx, tx, ids, etl.StatusProcessing); err != nil {
 		return nil, nil, err
 	}
 
@@ -118,31 +119,16 @@ func (r *sqlitePaymentRepo) FetchProcessed(
 	return nil, nil, nil
 }
 
-func (r *sqlitePaymentRepo) MarkSent(ctx context.Context, ids []domain.PaymentID) error {
+func (r *sqlitePaymentRepo) MarkStatus(ctx context.Context, ids []domain.PaymentID, status etl.EtlStatus) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	if err := r.markStatusTx(ctx, tx, ids, domain.StatusExported); err != nil {
+	if err := r.markStatusTx(ctx, tx, ids, status); err != nil {
 		return err
 	}
-
-	return tx.Commit()
-}
-
-func (r *sqlitePaymentRepo) MarkFailed(ctx context.Context, ids []domain.PaymentID) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if err := r.markStatusTx(ctx, tx, ids, domain.StatusFailed); err != nil {
-		return err
-	}
-
 	return tx.Commit()
 }
 
@@ -150,7 +136,7 @@ func (r *sqlitePaymentRepo) markStatusTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	ids []domain.PaymentID,
-	status domain.PaymentStatus,
+	status etl.EtlStatus,
 ) error {
 	placeholders := strings.Repeat("?,", len(ids))
 	placeholders = placeholders[:len(placeholders)-1]
@@ -174,7 +160,7 @@ func (r *sqlitePaymentRepo) markStatusTx(
 func (r *sqlitePaymentRepo) fetchPaymentsOnStatus(
 	ctx context.Context,
 	tx *sql.Tx,
-	status domain.PaymentStatus,
+	status etl.EtlStatus,
 	limit int,
 ) ([]domain.Payment, error) {
 	rows, err := tx.QueryContext(ctx, `

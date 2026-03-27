@@ -6,19 +6,11 @@ import (
 	"math"
 	"time"
 
+	"github.com/nisemenov/etl_service/internal/etl"
 	"github.com/nisemenov/etl_service/internal/validation"
 )
 
-const (
-	StatusNew        PaymentStatus = "new"
-	StatusProcessing PaymentStatus = "processing"
-	StatusExported   PaymentStatus = "exported"
-	StatusFailed     PaymentStatus = "failed"
-)
-
 type PaymentID int64
-
-type PaymentStatus string
 
 // Money type as float == int * 100
 type Money int64
@@ -43,7 +35,7 @@ type Payment struct {
 	ExecutionDateBySystem time.Time `validate:"required"`
 	Channel               string    `validate:"required"`
 
-	Status    PaymentStatus
+	Status    etl.EtlStatus
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

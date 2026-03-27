@@ -57,13 +57,12 @@ func TestETL_ProcessAndSend_OK(t *testing.T) {
 	err := etl.ProcessAndSend(context.Background())
 	require.NoError(t, err)
 
-	require.Equal(t, repo.newIds, repo.sentIds)
+	require.Equal(t, StatusSent, repo.etlStatus)
 	require.Equal(t, repo.batch, consumer.insertedBatch)
-	require.Len(t, consumer.insertedBatch, len(repo.newIds))
 }
 
-func TestETL_Insert_Error(t *testing.T) {
-	repo := &mockRepo{batch: []string{"test_batch"}, newIds: []int{1}}
+func TestETL_ProcessAndSend_CH_Error(t *testing.T) {
+	repo := &mockRepo{batch: []string{"test_batch"}, newIds:[]int{1}}
 	consumer := &mockConsumer{err: errors.New("CH error")}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -71,9 +70,9 @@ func TestETL_Insert_Error(t *testing.T) {
 
 	err := etl.ProcessAndSend(context.Background())
 	require.Error(t, err)
-	require.Nil(t, repo.sentIds)
-	require.Equal(t, repo.newIds, repo.failedIds)
+	require.Equal(t, StatusFailed, repo.etlStatus)
 }
+
 //
 // func TestETL_Run_OK(t *testing.T) {
 // 	producer := &mockProducer{

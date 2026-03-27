@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nisemenov/etl_service/internal/domain"
+	"github.com/nisemenov/etl_service/internal/etl"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,11 +22,11 @@ func TestPaymentRepo_SaveBatch(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, domain.StatusNew, 10)
+	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew, 10)
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
 	require.Equal(t, domain.PaymentID(1), payments[0].ID)
-	require.Equal(t, domain.StatusNew, payments[0].Status)
+	require.Equal(t, etl.StatusNew, payments[0].Status)
 }
 
 func TestPaymentRepo_SaveBatch_Empty(t *testing.T) {
@@ -39,12 +40,11 @@ func TestPaymentRepo_SaveBatch_Empty(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, domain.StatusNew, 10)
+	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew, 10)
 	require.NoError(t, err)
 	require.Len(t, payments, 0)
 }
 
-// интеграционный, проверяет также markStatusTx
 func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
@@ -60,7 +60,7 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 		DebtAmount:            domain.Money(1),
 		ExecutionDateBySystem: time.Now(),
 		Channel:               "sms",
-		Status:                domain.StatusNew,
+		Status:                etl.StatusNew,
 	}})
 
 	_, payments, err := repo.FetchForProcessing(ctx, 10)
@@ -72,7 +72,7 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	_, err = repo.fetchPaymentsOnStatus(ctx, tx, domain.StatusProcessing, 10)
+	_, err = repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusProcessing, 10)
 	require.NoError(t, err)
 }
 
@@ -89,42 +89,23 @@ func TestPaymentRepo_FetchForProcessing_Atomic(t *testing.T) {
 	require.Len(t, batch2, 0)
 }
 
-func TestPaymentRepo_MarkSent(t *testing.T) {
+func TestPaymentRepo_MarkStatus(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
-
 	repo.SaveBatch(ctx, []domain.Payment{{ID: 1}})
-	repo.MarkSent(ctx, []domain.PaymentID{1})
+
+	err := repo.MarkStatus(ctx, []domain.PaymentID{1}, etl.StatusProcessing)
+	require.NoError(t, err)
 
 	tx, err := repo.db.BeginTx(ctx, nil)
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, domain.StatusNew, 10)
+	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew, 10)
 	require.NoError(t, err)
 	require.Len(t, payments, 0)
 
-	payments, err = repo.fetchPaymentsOnStatus(ctx, tx, domain.StatusExported, 10)
-	require.NoError(t, err)
-	require.Len(t, payments, 1)
-}
-
-func TestPaymentRepo_MarkFailed(t *testing.T) {
-	ctx := context.Background()
-	repo := NewTestSQLitePaymentRepo(t)
-
-	repo.SaveBatch(ctx, []domain.Payment{{ID: 1}})
-	repo.MarkFailed(ctx, []domain.PaymentID{1})
-
-	tx, err := repo.db.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
-	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, domain.StatusNew, 10)
-	require.NoError(t, err)
-	require.Len(t, payments, 0)
-
-	payments, err = repo.fetchPaymentsOnStatus(ctx, tx, domain.StatusFailed, 10)
+	payments, err = repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusProcessing, 10)
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
 }

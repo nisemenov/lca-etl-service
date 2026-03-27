@@ -102,7 +102,6 @@ func TestAcknowledge_NoRecords(t *testing.T) {
 	require.Equal(t, StatusSent, repo.etlStatus)
 }
 
-
 func TestETL_Run_OK(t *testing.T) {
 	producer := &mockProducer{batch: []string{"test_batch"}}
 	repo := &mockRepo{newIds: []int{1}, sentIds: []int{1}}

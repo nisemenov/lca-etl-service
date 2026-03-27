@@ -36,7 +36,7 @@ func NewTestSQLitePaymentRepo(t *testing.T) *sqlitePaymentRepo {
 	return repo
 }
 
-func savePaymentBatch (ctx context.Context, repo *sqlitePaymentRepo, batch []domain.Payment) error {
+func savePaymentBatch(ctx context.Context, repo *sqlitePaymentRepo, batch []domain.Payment) error {
 	tx, err := repo.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

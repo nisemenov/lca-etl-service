@@ -71,7 +71,7 @@ func TestClickHouseLoader_InsertBatch_Empty(t *testing.T) {
 	require.Contains(t, buf.String(), "empty payments batch for CH InsertBatch")
 }
 
-func TestClickHouseLoader_InsertBatch_HTTPError(t *testing.T){
+func TestClickHouseLoader_InsertBatch_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))

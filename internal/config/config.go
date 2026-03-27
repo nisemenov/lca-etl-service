@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/joho/godotenv"
 	"github.com/nisemenov/etl_service/internal/validation"
 )
 
@@ -28,6 +29,11 @@ type Config struct {
 }
 
 func Load() *Config {
+	err := godotenv.Load()
+	if err != nil {
+		panic(err)
+	}
+
 	config := &Config{
 		DBPath:         getEnv("DB_PATH", ""),
 		APIBaseURL:     getEnv("API_BASE_URL", ""),

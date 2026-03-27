@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoad(t *testing.T) {
+func Test_Load(t *testing.T) {
 	os.Clearenv()
 
 	var panicMsg any

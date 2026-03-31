@@ -18,7 +18,7 @@ func TestETL_Fetch_OK(t *testing.T) {
 
 	etl := NewETLPipline(producer, repo, consumer, logger)
 
-	err := etl.Fetch(context.Background())
+	err := etl.fetch(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, producer.batch, repo.batch)
 }
@@ -31,7 +31,7 @@ func TestETL_Fetch_Error(t *testing.T) {
 
 	etl := NewETLPipline(producer, repo, consumer, logger)
 
-	err := etl.Fetch(context.Background())
+	err := etl.fetch(context.Background())
 	require.Error(t, err)
 }
 
@@ -43,7 +43,7 @@ func TestETL_Save_Error(t *testing.T) {
 
 	etl := NewETLPipline(producer, repo, consumer, logger)
 
-	err := etl.Fetch(context.Background())
+	err := etl.fetch(context.Background())
 	require.Error(t, err)
 }
 
@@ -54,7 +54,7 @@ func TestETL_Process_OK(t *testing.T) {
 
 	etl := NewETLPipline(nil, repo, consumer, logger)
 
-	err := etl.Process(context.Background())
+	err := etl.process(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, StatusSent, repo.etlStatus)
@@ -68,7 +68,7 @@ func TestETL_Process_CH_Error(t *testing.T) {
 
 	etl := NewETLPipline(nil, repo, consumer, logger)
 
-	err := etl.Process(context.Background())
+	err := etl.process(context.Background())
 	require.Error(t, err)
 	require.Equal(t, StatusFailed, repo.etlStatus)
 }
@@ -81,7 +81,7 @@ func TestAcknowledge_OK(t *testing.T) {
 
 	etl := NewETLPipline(producer, repo, nil, logger)
 
-	err := etl.Acknowledge(ctx)
+	err := etl.acknowledge(ctx)
 
 	require.NoError(t, err)
 	require.Equal(t, repo.sentIds, producer.ackIds)
@@ -95,7 +95,7 @@ func TestAcknowledge_NoRecords(t *testing.T) {
 
 	etl := NewETLPipline(producer, repo, nil, logger)
 
-	err := etl.Acknowledge(context.Background())
+	err := etl.acknowledge(context.Background())
 
 	require.NoError(t, err)
 	require.Nil(t, producer.ackIds)

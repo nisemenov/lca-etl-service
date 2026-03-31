@@ -21,17 +21,17 @@ type etlPipline[D any, ID comparable] struct {
 }
 
 func (etl *etlPipline[D, ID]) Run(ctx context.Context) error {
-	if err := etl.Fetch(ctx); err != nil {
+	if err := etl.fetch(ctx); err != nil {
 		etl.logger.Error("fetch stage failed", "err", err)
 		return err
 	}
 
-	if err := etl.Process(ctx); err != nil {
+	if err := etl.process(ctx); err != nil {
 		etl.logger.Error("process stage failed", "err", err)
 		return err
 	}
 
-	if err := etl.Acknowledge(ctx); err != nil {
+	if err := etl.acknowledge(ctx); err != nil {
 		etl.logger.Error("ack stage failed", "err", err)
 		return err
 	}
@@ -39,7 +39,7 @@ func (etl *etlPipline[D, ID]) Run(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipline[D, ID]) Fetch(ctx context.Context) error {
+func (etl *etlPipline[D, ID]) fetch(ctx context.Context) error {
 	instances, err := etl.producer.Fetch(ctx)
 	if err != nil {
 		return fmt.Errorf("producer fetch failed: %w", err)
@@ -57,7 +57,7 @@ func (etl *etlPipline[D, ID]) Fetch(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipline[D, ID]) Process(ctx context.Context) error {
+func (etl *etlPipline[D, ID]) process(ctx context.Context) error {
 	ids, instances, err := etl.repo.FetchForProcessing(ctx, fetchForProcessingLimit)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
@@ -85,7 +85,7 @@ func (etl *etlPipline[D, ID]) Process(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipline[D, ID]) Acknowledge(ctx context.Context) error {
+func (etl *etlPipline[D, ID]) acknowledge(ctx context.Context) error {
 	ids, err := etl.repo.FetchSentIds(ctx, fetchSentIdsLimit)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)

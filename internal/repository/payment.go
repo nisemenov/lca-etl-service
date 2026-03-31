@@ -20,8 +20,7 @@ type sqlitePaymentRepo struct {
 
 func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Payment) error {
 	if len(batch) == 0 {
-		r.logger.Warn("empty payments batch for SaveBatch")
-
+		r.logger.Info("empty batch for SaveBatch")
 		return nil
 	}
 
@@ -45,17 +44,16 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 			channel,
 			status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            status = excluded.status,
-            updated_at = CURRENT_TIMESTAMP
+        ON CONFLICT(id) DO NOTHING
 	`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
+	var inserted int64
 	for _, p := range batch {
-		_, err := stmt.ExecContext(ctx,
+		res, err := stmt.ExecContext(ctx,
 			p.ID,
 			p.CaseID,
 			p.DebtorID,
@@ -71,14 +69,25 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 		if err != nil {
 			return fmt.Errorf("insert payment %d: %w", p.ID, err)
 		}
+
+		inserted, _ = res.RowsAffected()
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	r.logger.Info("new payments batch saved successfully", "count", inserted)
+	return nil
 }
 
 // FetchForProcessing меняет статусы в бд на StatusProcessing;
 // возвращает батч со status == StatusNew, потому что в CH они не вставляются
-func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) ([]domain.PaymentID, []domain.Payment, error) {
+func (r *sqlitePaymentRepo) FetchForProcessing(
+	ctx context.Context,
+	limit int,
+) ([]domain.PaymentID, []domain.Payment, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, nil, err
@@ -91,7 +100,7 @@ func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 	}
 
 	if len(payments) == 0 {
-		r.logger.Warn("empty payments batch for FetchForProcessing")
+		r.logger.Info("empty batch for FetchForProcessing")
 		return nil, nil, nil
 	}
 
@@ -108,6 +117,7 @@ func (r *sqlitePaymentRepo) FetchForProcessing(ctx context.Context, limit int) (
 		return nil, nil, err
 	}
 
+	r.logger.Info("payments fetched for processing successfully", "count", len(ids))
 	return ids, payments, nil
 }
 
@@ -124,7 +134,7 @@ func (r *sqlitePaymentRepo) FetchSentIds(ctx context.Context, limit int) ([]doma
 	}
 
 	if len(payments) == 0 {
-		r.logger.Warn("empty payments batch for FetchForProcessing")
+		r.logger.Info("empty batch for FetchSentIds")
 		return nil, nil
 	}
 

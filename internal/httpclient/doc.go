@@ -12,7 +12,7 @@
 //	apiClient := httpclient.NewHTTPClient(
 //		&http.Client{...},
 //	    "https://api.internal",
-//	    httpclient.WithDefaultHeaders(map[string]string{
+//	    httpclient.WithHeaders(map[string]string{
 //	        "X-Internal-Token": "secret_token",
 //	    }),
 //	)

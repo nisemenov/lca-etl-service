@@ -8,6 +8,11 @@ import (
 	"log/slog"
 )
 
+const (
+	fetchForProcessingLimit = 1000
+	fetchSentIdsLimit       = 1000
+)
+
 type etlPipline[D any, ID comparable] struct {
 	producer Producer[D, ID]
 	repo     Repository[D, ID]
@@ -39,8 +44,7 @@ func (etl *etlPipline[D, ID]) Fetch(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("producer fetch failed: %w", err)
 	}
-
-	if len(instances) == 0 {
+	if instances == nil {
 		etl.logger.Info("no instances fetched from producer")
 		return nil
 	}
@@ -54,13 +58,13 @@ func (etl *etlPipline[D, ID]) Fetch(ctx context.Context) error {
 }
 
 func (etl *etlPipline[D, ID]) Process(ctx context.Context) error {
-	ids, instances, err := etl.repo.FetchForProcessing(ctx, 500)
+	ids, instances, err := etl.repo.FetchForProcessing(ctx, fetchForProcessingLimit)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}
 
 	if len(instances) == 0 {
-		etl.logger.Warn("no instances for processing")
+		etl.logger.Info("no instances for processing")
 		return nil
 	}
 
@@ -82,13 +86,13 @@ func (etl *etlPipline[D, ID]) Process(ctx context.Context) error {
 }
 
 func (etl *etlPipline[D, ID]) Acknowledge(ctx context.Context) error {
-	ids, err := etl.repo.FetchSentIds(ctx, 100)
+	ids, err := etl.repo.FetchSentIds(ctx, fetchSentIdsLimit)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}
 
 	if len(ids) == 0 {
-		etl.logger.Warn("no instances to acknowledge")
+		etl.logger.Info("no instances to acknowledge")
 		return nil
 	}
 

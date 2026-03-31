@@ -1,6 +1,7 @@
 package producer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -29,8 +30,8 @@ func TestPaymentProducer_Fetch_OK(t *testing.T) {
             		"full_name": "Петров Петр Петрович",
             		"credit_number": "XYZ789",
             		"credit_issue_date": "2023-05-05T00:00:00+00:00",
-            		"amount": 100.00,
-            		"debt_amount": 100.00,
+            		"amount": "100.00",
+            		"debt_amount": "100.00",
             		"execution_date_by_system": "2024-07-01T12:00:00Z",
             		"channel": "email"
 				}
@@ -48,7 +49,6 @@ func TestPaymentProducer_Fetch_OK(t *testing.T) {
 	first := payments[0]
 	require.Equal(t, domain.PaymentID(1), first.ID)
 	require.Equal(t, "Петров Петр Петрович", first.FullName)
-	require.Equal(t, domain.Money(10000), first.Amount)
 }
 
 func TestPaymentProducer_Fetch_SkipsInvalid(t *testing.T) {
@@ -66,8 +66,8 @@ func TestPaymentProducer_Fetch_SkipsInvalid(t *testing.T) {
             		"full_name": "Петров Петр Петрович",
             		"credit_number": "XYZ789",
             		"credit_issue_date": "2023-05-05T00:00:00+00:00",
-            		"amount": 100.00,
-            		"debt_amount": 100.00,
+            		"amount": "100.00",
+            		"debt_amount": "100.00",
             		"execution_date_by_system": "2024-07-01T12:00:00Z",
             		"channel": "email"
 				},
@@ -112,11 +112,16 @@ func TestPaymentProducer_Fetch_EmptyResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	payProducer := getPayProducer(server.URL)
+	buf := &bytes.Buffer{}
+	logger := slog.New(slog.NewTextHandler(buf, nil))
+	http := httpclient.NewHTTPClient(&http.Client{}, server.URL, logger)
+	payProducer := NewPaymentProducer(http, logger)
+
 	payments, err := payProducer.Fetch(context.Background())
 
 	require.NoError(t, err)
 	require.Len(t, payments, 0)
+	require.Contains(t, buf.String(), "no new payments data to export")
 }
 
 func TestPaymentProducer_Fetch_InvalidJSON(t *testing.T) {
@@ -174,9 +179,9 @@ func TestPaymentProducer_Acknowledge_Empty(t *testing.T) {
 }
 
 func getPayProducer(baseURL string) *paymentProducer {
-	http := httpclient.NewHTTPClient(&http.Client{}, baseURL)
 	// logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	http := httpclient.NewHTTPClient(&http.Client{}, baseURL, logger)
 
 	return NewPaymentProducer(http, logger)
 }

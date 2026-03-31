@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,7 +26,7 @@ func TestHTTPClient_Get_OK(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := NewHTTPClient(&http.Client{}, server.URL)
+	p := getHttpClient(&http.Client{}, server.URL)
 
 	var resp struct {
 		Value int `json:"value"`
@@ -41,7 +43,7 @@ func TestHTTPClient_Get_ErrorStatus(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := NewHTTPClient(&http.Client{}, server.URL)
+	p := getHttpClient(&http.Client{}, server.URL)
 
 	var out any
 	err := p.Get(context.Background(), testURL, &out)
@@ -62,7 +64,7 @@ func TestHTTPClient_PostRaw(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := NewHTTPClient(&http.Client{}, server.URL)
+	p := getHttpClient(&http.Client{}, server.URL)
 	// convert req body to bytes
 	b, _ := json.Marshal(map[string]int{"id": 123})
 
@@ -82,7 +84,7 @@ func TestHTTPClient_Post(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := NewHTTPClient(&http.Client{}, server.URL)
+	p := getHttpClient(&http.Client{}, server.URL)
 
 	err := p.Post(context.Background(), testURL, map[string]int{"id": 123})
 	require.NoError(t, err)
@@ -97,11 +99,18 @@ func TestHTTPClient_Timeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := NewHTTPClient(&http.Client{Timeout: 50 * time.Millisecond}, server.URL)
+	p := getHttpClient(&http.Client{Timeout: 50 * time.Millisecond}, server.URL)
 
 	var out any
 	err := p.Get(context.Background(), testURL, &out)
 
 	require.Error(t, err)
 	require.True(t, called)
+}
+
+func getHttpClient(http *http.Client, baseURL string) *HTTPClient {
+	// logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	return NewHTTPClient(http, baseURL, logger)
 }

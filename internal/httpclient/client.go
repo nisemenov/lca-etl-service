@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 )
 
@@ -16,6 +17,7 @@ type HTTPClient struct {
 	baseURL    string
 	headers    map[string]string
 	middleware func(*http.Request)
+	logger     *slog.Logger
 }
 
 func (c *HTTPClient) Get(ctx context.Context, path string, out any) error {
@@ -32,11 +34,21 @@ func (c *HTTPClient) Get(ctx context.Context, path string, out any) error {
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	// c.logger.Debug(
+	// 	"raw response",
+	// 	"status", resp.StatusCode,
+	// 	"body", string(body),
+	// )
+
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("http %d", resp.StatusCode)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(out)
+	return json.Unmarshal(body, out)
 }
 
 func (c *HTTPClient) Post(ctx context.Context, path string, body any) error {
@@ -73,11 +85,12 @@ func (c *HTTPClient) applyHeadersAndMiddleware(req *http.Request) {
 	}
 }
 
-func NewHTTPClient(client *http.Client, baseURL string, opts ...Option) *HTTPClient {
+func NewHTTPClient(client *http.Client, baseURL string, logger *slog.Logger, opts ...Option) *HTTPClient {
 	c := &HTTPClient{
 		client:  client,
 		baseURL: baseURL,
 		headers: make(map[string]string),
+		logger:  logger,
 	}
 
 	// for modification HTTPClient from high levels

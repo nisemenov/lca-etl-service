@@ -23,6 +23,12 @@ type Config struct {
 	DBPath     string `validate:"required"`
 	APIBaseURL string `validate:"required"`
 
+	ClickHouseHost     string `validate:"required"`
+	ClickHousePort     string `validate:"required"`
+	ClickHouseUser     string `validate:"required"`
+	ClickHousePassword string `validate:"required"`
+	ClickHouseDB       string `validate:"required"`
+
 	XInternalToken string `validate:"required"`
 
 	Debug bool
@@ -35,14 +41,18 @@ func Load() *Config {
 	}
 
 	config := &Config{
-		DBPath:         getEnv("DB_PATH", ""),
-		APIBaseURL:     getEnv("API_BASE_URL", ""),
-		XInternalToken: getEnv("X_INTERNAL_TOKEN", ""),
-		Debug:          getEnvBool("DEBUG"),
+		DBPath:             getEnv("DB_PATH", ""),
+		APIBaseURL:         getEnv("API_BASE_URL", ""),
+		ClickHouseHost:     getEnv("CLICKHOUSE_HOST", ""),
+		ClickHousePort:     getEnv("CLICKHOUSE_PORT", ""),
+		ClickHouseUser:     getEnv("CLICKHOUSE_USER", ""),
+		ClickHousePassword: getEnv("CLICKHOUSE_PASSWORD", ""),
+		ClickHouseDB:       getEnv("CLICKHOUSE_DB", ""),
+		XInternalToken:     getEnv("X_INTERNAL_TOKEN", ""),
+		Debug:              getEnvBool("DEBUG"),
 	}
 
 	if err := validation.Validate.Struct(config); err != nil {
-		// TODO: logger?
 		panic(err)
 	}
 

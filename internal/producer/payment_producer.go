@@ -26,6 +26,10 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 		)
 		return nil, err
 	}
+	if len(resp.Data) == 0 {
+		p.logger.Info("no new payments data to export")
+		return nil, nil
+	}
 
 	// fill in output with validated data
 	response := make([]domain.Payment, 0, len(resp.Data))
@@ -39,9 +43,6 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 			continue
 		}
 
-		amount := domain.FloatToMoney(rawPayment.Amount)
-		debt := domain.FloatToMoney(rawPayment.DebtAmount)
-
 		response = append(response, domain.Payment{
 			ID:                    rawPayment.ID,
 			CaseID:                rawPayment.CaseID,
@@ -49,16 +50,18 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 			FullName:              rawPayment.FullName,
 			CreditNumber:          rawPayment.CreditNumber,
 			CreditIssueDate:       rawPayment.CreditIssueDate,
-			Amount:                amount,
-			DebtAmount:            debt,
+			Amount:                domain.Money(rawPayment.Amount),
+			DebtAmount:            domain.Money(rawPayment.DebtAmount),
 			ExecutionDateBySystem: rawPayment.ExecutionDateBySystem,
 			Channel:               rawPayment.Channel,
 		})
 	}
 	if len(response) == 0 {
-		p.logger.Error("all payments invalid")
+		p.logger.Warn("all payments invalid")
+		return nil, err
 	}
 
+	p.logger.Info("payments fetched successfully", "count", len(response))
 	return response, nil
 }
 

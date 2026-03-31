@@ -3,30 +3,21 @@
 package domain
 
 import (
-	"math"
 	"time"
 
 	"github.com/nisemenov/etl_service/internal/etl"
 	"github.com/nisemenov/etl_service/internal/validation"
 )
 
-type PaymentID int64
+type PaymentID int
 
-// Money type as float == int * 100
-type Money int64
-
-func FloatToMoney(f float64) Money {
-	return Money(math.Round(f * 100))
-}
-
-func (m Money) Float64() float64 {
-	return float64(m) / 100
-}
+// Money type as string, Decimal(18,2) from API
+type Money string
 
 type Payment struct {
 	ID                    PaymentID `validate:"required"`
-	CaseID                int64     `validate:"required"`
-	DebtorID              int64     `validate:"required"`
+	CaseID                int       `validate:"required"`
+	DebtorID              int       `validate:"required"`
 	FullName              string    `validate:"required"`
 	CreditNumber          string    `validate:"required"`
 	CreditIssueDate       time.Time `validate:"required"`

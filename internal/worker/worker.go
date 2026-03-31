@@ -8,22 +8,14 @@ import (
 	"time"
 )
 
-type Runner interface {
+type EtlPipline interface {
 	Run(ctx context.Context) error
 }
 
 type Worker struct {
-	runner   Runner
-	interval time.Duration
-	logger   *slog.Logger
-}
-
-func New(r Runner, interval time.Duration, l *slog.Logger) *Worker {
-	return &Worker{
-		runner:   r,
-		interval: interval,
-		logger:   l,
-	}
+	etlPipline EtlPipline
+	interval   time.Duration
+	logger     *slog.Logger
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -36,9 +28,17 @@ func (w *Worker) Run(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			if err := w.runner.Run(ctx); err != nil {
-				w.logger.Error("etl failed", "err", err)
+			if err := w.etlPipline.Run(ctx); err != nil {
+				w.logger.Error("etl pipline failed", "err", err)
 			}
 		}
+	}
+}
+
+func NewWorker(etl EtlPipline, interval time.Duration, logger *slog.Logger) *Worker {
+	return &Worker{
+		etlPipline: etl,
+		interval:   interval,
+		logger:     logger,
 	}
 }

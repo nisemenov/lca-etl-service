@@ -15,8 +15,8 @@ func TestPayment(t *testing.T) {
 		FullName:              "John Doe",
 		CreditNumber:          "1",
 		CreditIssueDate:       time.Now(),
-		Amount:                Money(1),
-		DebtAmount:            Money(1),
+		Amount:                Money("1.0"),
+		DebtAmount:            Money("1.0"),
 		ExecutionDateBySystem: time.Now(),
 		Channel:               "sms",
 	}

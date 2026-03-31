@@ -56,8 +56,8 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 		FullName:              "John Doe",
 		CreditNumber:          "1",
 		CreditIssueDate:       time.Now(),
-		Amount:                domain.Money(1),
-		DebtAmount:            domain.Money(1),
+		Amount:                domain.Money("1"),
+		DebtAmount:            domain.Money("1"),
 		ExecutionDateBySystem: time.Now(),
 		Channel:               "sms",
 	}})

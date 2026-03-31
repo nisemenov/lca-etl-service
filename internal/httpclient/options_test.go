@@ -3,6 +3,8 @@ package httpclient
 import (
 	"bytes"
 	"context"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,7 +18,8 @@ func TestHTTPClient_WithHeaders(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := NewHTTPClient(&http.Client{}, server.URL, WithHeaders(map[string]string{"testHeader": "test_header"}))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	p := NewHTTPClient(&http.Client{}, server.URL, logger, WithHeaders(map[string]string{"testHeader": "test_header"}))
 
 	var out any
 	err := p.Get(context.Background(), testURL, &out)
@@ -33,9 +36,11 @@ func TestHTTPClient_BasicAuth(t *testing.T) {
 	}))
 	defer server.Close()
 
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	p := NewHTTPClient(
 		&http.Client{},
 		server.URL,
+		logger,
 		WithMiddleware(func(r *http.Request) { r.SetBasicAuth("username", "pass") }),
 	)
 

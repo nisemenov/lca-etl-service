@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,21 +20,32 @@ import (
 	"github.com/nisemenov/etl_service/internal/worker"
 )
 
-func main() {
-	level := slog.LevelInfo
-	cfg := config.Load()
+const scheduleCron = 1 * time.Minute
 
-	if cfg.Debug {
+func newLogger(debug bool) *slog.Logger {
+	level := slog.LevelInfo
+	if debug {
 		level = slog.LevelDebug
 	}
 
-	// init Logger
-	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	opts := &slog.HandlerOptions{
 		Level:     level,
-		AddSource: cfg.Debug, // показываем source только при cnf.Debug == true
-	})
-	logger := slog.New(handler)
-	slog.SetDefault(logger) // опционально, если хочешь использовать slog.Info() без переменной
+		// AddSource: debug,
+	}
+
+	if debug {
+		return slog.New(slog.NewTextHandler(os.Stdout, opts))
+	}
+
+	return slog.New(slog.NewJSONHandler(os.Stdout, opts))
+}
+
+func main() {
+	cfg := config.Load()
+
+	// init Logger
+	logger := newLogger(cfg.Debug)
+	slog.SetDefault(logger)
 
 	logger.Info(
 		"starting application",
@@ -57,17 +69,30 @@ func main() {
 		cancel()
 	}()
 
-	httpClient := httpclient.NewHTTPClient(&http.Client{}, cfg.APIBaseURL)
+	// HTTP Clients
+	baseHTTP := &http.Client{
+		Timeout: 60 * time.Second,
+	}
+	apiClient := httpclient.NewHTTPClient(baseHTTP, cfg.APIBaseURL, logger.With("component", "httpclient"))
+	chClient := httpclient.NewHTTPClient(
+		baseHTTP,
+		fmt.Sprintf("http://%s:%s", cfg.ClickHouseHost, cfg.ClickHousePort),
+		logger.With("component", "httpclient"),
+		httpclient.WithHeaders(
+			map[string]string{"X-ClickHouse-Database": cfg.ClickHouseDB},
+		),
+		httpclient.WithMiddleware(
+			func(r *http.Request) { r.SetBasicAuth(cfg.ClickHouseUser, cfg.ClickHousePassword) },
+		),
+	)
 
-	producerPayment := producer.NewPaymentProducer(httpClient, logger)
-
-	repoPayment := repository.NewSQLitePaymentRepo(db, logger)
-
-	consumerPayment := consumer.NewClickHouseLoader(httpClient, "payments", logger)
-
-	etlPayment := etl.NewETLPipline(producerPayment, repoPayment, consumerPayment, logger)
-
-	workerPayment := worker.New(etlPayment, 5*time.Second, logger)
-
+	// piplines
+	etlPayment := etl.NewETLPipline(
+		producer.NewPaymentProducer(apiClient, logger.With("component", "payment producer")),
+		repository.NewSQLitePaymentRepo(db, logger.With("component", "payment repository")),
+		consumer.NewClickHouseLoader(chClient, "short_url_tasks", logger.With("component", "payment consumer")),
+		logger.With("component", "payment etl"),
+	)
+	workerPayment := worker.NewWorker(etlPayment, scheduleCron, logger.With("component", "payment worker"))
 	workerPayment.Run(ctx)
 }

@@ -5,7 +5,6 @@ package consumer
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -14,13 +13,20 @@ import (
 	"github.com/nisemenov/etl_service/internal/httpclient"
 )
 
-type clickHouseLoader struct {
-	http   *httpclient.HTTPClient
-	table  string
-	logger *slog.Logger
+type domType interface {
+	domain.Payment | domain.YooPayment
 }
 
-func (c *clickHouseLoader) InsertBatch(ctx context.Context, batch []domain.Payment) error {
+type rowBuilder[T domType] func(item T) ([]byte, error)
+
+type clickHouseLoader[T domType] struct {
+	http    *httpclient.HTTPClient
+	table   string
+	builder rowBuilder[T]
+	logger  *slog.Logger
+}
+
+func (c *clickHouseLoader[T]) InsertBatch(ctx context.Context, batch []T) error {
 	var lastErr error
 
 	for i := range 3 {
@@ -42,7 +48,7 @@ func (c *clickHouseLoader) InsertBatch(ctx context.Context, batch []domain.Payme
 	return lastErr
 }
 
-func (c *clickHouseLoader) insertOnce(ctx context.Context, batch []domain.Payment) error {
+func (c *clickHouseLoader[T]) insertOnce(ctx context.Context, batch []T) error {
 	if len(batch) == 0 {
 		c.logger.Info("empty batch for InsertBatch")
 		return nil
@@ -51,11 +57,10 @@ func (c *clickHouseLoader) insertOnce(ctx context.Context, batch []domain.Paymen
 	var buf bytes.Buffer
 
 	for _, p := range batch {
-		row, err := c.paymentToClickHouseRow(p)
+		row, err := c.builder(p)
 		if err != nil {
 			c.logger.Warn(
 				"failed to build row",
-				"payment.ID", p.ID,
 				"err", err,
 			)
 			continue
@@ -80,21 +85,8 @@ func (c *clickHouseLoader) insertOnce(ctx context.Context, batch []domain.Paymen
 	return nil
 }
 
-func (c *clickHouseLoader) paymentToClickHouseRow(payment domain.Payment) ([]byte, error) {
-	row := map[string]any{
-		"case_id":                  payment.CaseID,
-		"debtor_id":                payment.DebtorID,
-		"full_name":                payment.FullName,
-		"credit_number":            payment.CreditNumber,
-		"credit_issue_date":        payment.CreditIssueDate.Format("2006-01-02 15:04:05.000"),
-		"amount":                   payment.Amount,
-		"debt_amount":              payment.DebtAmount,
-		"execution_date_by_system": payment.ExecutionDateBySystem.Format("2006-01-02 15:04:05.000"),
-		"channel":                  payment.Channel,
-	}
-	return json.Marshal(row)
-}
-
-func NewClickHouseLoader(http *httpclient.HTTPClient, table string, logger *slog.Logger) *clickHouseLoader {
-	return &clickHouseLoader{http: http, table: table, logger: logger}
+func NewClickHouseLoader[T domType](
+	http *httpclient.HTTPClient, table string, builder rowBuilder[T], logger *slog.Logger,
+) *clickHouseLoader[T] {
+	return &clickHouseLoader[T]{http: http, table: table, builder: builder, logger: logger}
 }

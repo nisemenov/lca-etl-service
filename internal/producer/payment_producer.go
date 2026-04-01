@@ -67,7 +67,7 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 
 func (p *paymentProducer) Acknowledge(ctx context.Context, ids []domain.PaymentID) error {
 	if len(ids) == 0 {
-		p.logger.Warn("empty ids batch for AcknowledgePayments")
+		p.logger.Warn("empty payment ids batch for Acknowledge")
 		return nil
 	}
 

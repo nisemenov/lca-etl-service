@@ -29,6 +29,8 @@ func NewTestSQLiteDB(t *testing.T) *sql.DB {
 }
 
 func NewTestSQLitePaymentRepo(t *testing.T) *sqlitePaymentRepo {
+	t.Helper()
+
 	db := NewTestSQLiteDB(t)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
@@ -76,6 +78,69 @@ func savePaymentBatch(ctx context.Context, repo *sqlitePaymentRepo, batch []doma
 			p.ExecutionDateBySystem,
 			p.Channel,
 			p.Status,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func NewTestSQLiteYooPaymentRepo(t *testing.T) *sqliteYooPaymentRepo {
+	t.Helper()
+
+	db := NewTestSQLiteDB(t)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	repo := NewSQLiteYooPaymentRepo(db, logger)
+	return repo
+}
+
+func saveYooPaymentBatch(ctx context.Context, repo *sqliteYooPaymentRepo, batch []domain.YooPayment) error {
+	tx, err := repo.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+        INSERT INTO yookassa (
+			id,
+			case_id,
+			debtor_id,
+			full_name,
+			credit_number,
+			credit_issue_date,
+			amount,
+			yookassa_id,
+			technical_status,
+			yoo_created_at,
+			execution_date_by_system,
+			description,
+			status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, yoo := range batch {
+		_, err := stmt.ExecContext(ctx,
+			yoo.ID,
+			yoo.CaseID,
+			yoo.DebtorID,
+			yoo.FullName,
+			yoo.CreditNumber,
+			yoo.CreditIssueDate,
+			yoo.Amount,
+			yoo.YookassaID,
+			yoo.TechnicalStatus,
+			yoo.YooCreatedAt,
+			yoo.ExecutionDateBySystem,
+			yoo.Description,
+			yoo.Status,
 		)
 		if err != nil {
 			return err

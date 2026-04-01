@@ -29,6 +29,9 @@ type Config struct {
 	ClickHousePassword string `validate:"required"`
 	ClickHouseDB       string `validate:"required"`
 
+	PaymentCHTableName    string `validate:"required"`
+	YooPaymentCHTableName string `validate:"required"`
+
 	XInternalToken string `validate:"required"`
 
 	Debug bool
@@ -41,15 +44,17 @@ func Load() *Config {
 	}
 
 	config := &Config{
-		DBPath:             getEnv("DB_PATH", ""),
-		APIBaseURL:         getEnv("API_BASE_URL", ""),
-		ClickHouseHost:     getEnv("CLICKHOUSE_HOST", ""),
-		ClickHousePort:     getEnv("CLICKHOUSE_PORT", ""),
-		ClickHouseUser:     getEnv("CLICKHOUSE_USER", ""),
-		ClickHousePassword: getEnv("CLICKHOUSE_PASSWORD", ""),
-		ClickHouseDB:       getEnv("CLICKHOUSE_DB", ""),
-		XInternalToken:     getEnv("X_INTERNAL_TOKEN", ""),
-		Debug:              getEnvBool("DEBUG"),
+		DBPath:                getEnv("DB_PATH", ""),
+		APIBaseURL:            getEnv("API_BASE_URL", ""),
+		ClickHouseHost:        getEnv("CLICKHOUSE_HOST", ""),
+		ClickHousePort:        getEnv("CLICKHOUSE_PORT", ""),
+		ClickHouseUser:        getEnv("CLICKHOUSE_USER", ""),
+		ClickHousePassword:    getEnv("CLICKHOUSE_PASSWORD", ""),
+		ClickHouseDB:          getEnv("CLICKHOUSE_DB", ""),
+		PaymentCHTableName:    getEnv("PAYMENT_CH_TABLE_NAME", ""),
+		YooPaymentCHTableName: getEnv("YOO_PAYMENT_CH_TABLE_NAME", ""),
+		XInternalToken:        getEnv("X_INTERNAL_TOKEN", ""),
+		Debug:                 getEnvBool("DEBUG"),
 	}
 
 	if err := validation.Validate.Struct(config); err != nil {

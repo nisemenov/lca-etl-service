@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClickHouseLoader_InsertBatch_OK(t *testing.T) {
+func TestClickHousePayment_InsertBatch_OK(t *testing.T) {
 	var req *http.Request
 	var receivedBody []byte
 
@@ -34,7 +34,7 @@ func TestClickHouseLoader_InsertBatch_OK(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	httpClient := httpclient.NewHTTPClient(&http.Client{}, server.URL, logger)
-	loader := NewClickHouseLoader(httpClient, "payments", logger)
+	loader := NewClickHouseLoader(httpClient, "payments", PaymentToClickHouseRow, logger)
 
 	payments := []domain.Payment{
 		{ID: 1, FullName: "Ivan", Amount: domain.Money("10000")},
@@ -57,17 +57,17 @@ func TestClickHouseLoader_InsertBatch_OK(t *testing.T) {
 	require.Equal(t, "Petr", r2["full_name"])
 }
 
-func TestClickHouseLoader_InsertBatch_Empty(t *testing.T) {
+func TestClickHousePayment_InsertBatch_Empty(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(buf, nil))
-	loader := NewClickHouseLoader(nil, "", logger)
+	loader := NewClickHouseLoader(nil, "", PaymentToClickHouseRow, logger)
 
 	err := loader.InsertBatch(context.Background(), nil)
 	require.NoError(t, err)
 	require.Contains(t, buf.String(), "empty batch for InsertBatch")
 }
 
-func TestClickHouseLoader_InsertBatch_HTTPError(t *testing.T) {
+func TestClickHousePayment_InsertBatch_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -76,7 +76,7 @@ func TestClickHouseLoader_InsertBatch_HTTPError(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
 	httpClient := httpclient.NewHTTPClient(&http.Client{}, server.URL, logger)
-	loader := NewClickHouseLoader(httpClient, "payments", logger)
+	loader := NewClickHouseLoader(httpClient, "payments", PaymentToClickHouseRow, logger)
 
 	err := loader.InsertBatch(context.Background(), []domain.Payment{{ID: domain.PaymentID(1)}})
 	require.Error(t, err)

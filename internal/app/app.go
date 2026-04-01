@@ -30,15 +30,7 @@ type App struct {
 func New(cfg *config.Config) *App {
 	logger := newLogger(cfg.Debug)
 
-	db := sqlite.OpenSQLite(cfg.DBPath)
-	_, err := db.Exec("PRAGMA journal_mode = WAL;")
-	if err != nil {
-		panic(err)
-	}
-	err = sqlite.Migrate(db)
-	if err != nil {
-		panic(err)
-	}
+	db := sqlite.InitSQLite(cfg.DBPath)
 
 	workers := buildWorkers(cfg, logger, db)
 

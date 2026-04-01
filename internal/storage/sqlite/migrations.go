@@ -25,11 +25,25 @@ func Migrate(db *sql.DB) error {
 	return goose.Up(db, "migrations")
 }
 
-func OpenSQLite(dsn string) *sql.DB {
+func InitSQLite(dsn string) *sql.DB {
 	db, err := sql.Open("sqlite3", dsn)
-
 	if err != nil {
-		panic(fmt.Sprintf("failed to open DB %q", dsn))
+		panic(err)
+	}
+
+	_, err = db.Exec("PRAGMA journal_mode = WAL;")
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = db.Exec("PRAGMA synchronous = NORMAL;")
+	if err != nil {
+		panic(err)
+	}
+
+	err = Migrate(db)
+	if err != nil {
+		panic(err)
 	}
 
 	return db

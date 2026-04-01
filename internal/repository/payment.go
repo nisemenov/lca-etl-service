@@ -70,7 +70,8 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 			return fmt.Errorf("insert payment %d: %w", p.ID, err)
 		}
 
-		inserted, _ = res.RowsAffected()
+		affected, _ := res.RowsAffected()
+		inserted += affected
 	}
 
 	err = tx.Commit()

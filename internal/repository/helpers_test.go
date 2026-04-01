@@ -32,7 +32,9 @@ func NewTestSQLitePaymentRepo(t *testing.T) *sqlitePaymentRepo {
 	t.Helper()
 
 	db := NewTestSQLiteDB(t)
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	// hndlr := os.Stdout
+	hndlr := io.Discard
+	logger := slog.New(slog.NewTextHandler(hndlr, nil))
 
 	repo := NewSQLitePaymentRepo(db, logger)
 	return repo

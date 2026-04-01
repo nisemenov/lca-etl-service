@@ -74,7 +74,8 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 			return fmt.Errorf("insert yookassa payment %d: %w", yoo.ID, err)
 		}
 
-		inserted, _ = res.RowsAffected()
+		affected, _ := res.RowsAffected()
+		inserted += affected
 	}
 
 	err = tx.Commit()

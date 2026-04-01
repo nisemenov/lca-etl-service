@@ -27,12 +27,12 @@ func YooPaymentToClickHouseRow(yoo domain.YooPayment) ([]byte, error) {
 		"debtor_id":                yoo.DebtorID,
 		"full_name":                yoo.FullName,
 		"credit_number":            yoo.CreditNumber,
-		"credit_issue_date":        yoo.CreditIssueDate,
+		"credit_issue_date":        yoo.CreditIssueDate.Format("2006-01-02 15:04:05.000"),
 		"amount":                   yoo.Amount,
 		"yookassa_id":              yoo.YookassaID,
 		"technical_status":         yoo.TechnicalStatus,
-		"yoo_created_at":           yoo.YooCreatedAt,
-		"execution_date_by_system": yoo.ExecutionDateBySystem,
+		"yoo_created_at":           yoo.YooCreatedAt.Format("2006-01-02 15:04:05.000"),
+		"execution_date_by_system": yoo.ExecutionDateBySystem.Format("2006-01-02 15:04:05.000"),
 		"description":              yoo.Description,
 	}
 	return json.Marshal(row)

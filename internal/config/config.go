@@ -32,8 +32,6 @@ type Config struct {
 	PaymentCHTableName    string `validate:"required"`
 	YooPaymentCHTableName string `validate:"required"`
 
-	XInternalToken string `validate:"required"`
-
 	Debug bool
 }
 
@@ -53,7 +51,6 @@ func Load() *Config {
 		ClickHouseDB:          getEnv("CLICKHOUSE_DB", ""),
 		PaymentCHTableName:    getEnv("PAYMENT_CH_TABLE_NAME", ""),
 		YooPaymentCHTableName: getEnv("YOO_PAYMENT_CH_TABLE_NAME", ""),
-		XInternalToken:        getEnv("X_INTERNAL_TOKEN", ""),
 		Debug:                 getEnvBool("DEBUG"),
 	}
 

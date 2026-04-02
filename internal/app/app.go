@@ -59,7 +59,10 @@ func (a *App) Run() {
 
 	<-ctx.Done()
 
-	a.logger.Info("shutdown signal received")
+	a.logger.Info(
+		"shutdown signal received",
+		"ctx cause", context.Cause(ctx),
+	)
 
 	time.Sleep(200 * time.Millisecond)
 

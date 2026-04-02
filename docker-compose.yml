@@ -1,0 +1,34 @@
+services:
+  etl:
+    container_name: etl_service
+    build: .
+    restart: unless-stopped
+
+    environment:
+      DB_PATH: ${DB_PATH}
+      API_BASE_URL: ${API_BASE_URL}
+
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST}
+      CLICKHOUSE_PORT: ${CLICKHOUSE_PORT}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+
+      PAYMENT_CH_TABLE_NAME: ${PAYMENT_CH_TABLE_NAME}
+      YOO_PAYMENT_CH_TABLE_NAME: ${YOO_PAYMENT_CH_TABLE_NAME}
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
+
+    volumes:
+      - /home/user/Dev/etl_service/db:/db
+    networks:
+      - etl_service_main
+
+networks:
+  etl_service_main:
+    driver: bridge

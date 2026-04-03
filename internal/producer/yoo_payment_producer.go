@@ -18,7 +18,7 @@ type yooPaymentProducer struct {
 func (y *yooPaymentProducer) Fetch(ctx context.Context) ([]domain.YooPayment, error) {
 	var resp fetchYooPaymentsResponse
 
-	err := y.http.Get(ctx, FetchYookassaPath, &resp)
+	err := y.http.Get(ctx, YookassaPath, &resp)
 	if err != nil {
 		y.logger.Error(
 			"failed to fetch yookassa payment data",
@@ -73,7 +73,7 @@ func (y *yooPaymentProducer) Acknowledge(ctx context.Context, ids []domain.YooPa
 		return nil
 	}
 
-	err := y.http.Post(ctx, AckYookassaPath, ackYooPaymentRequest{IDs: ids})
+	err := y.http.Patch(ctx, YookassaPath, ackYooPaymentRequest{IDs: ids})
 	if err != nil {
 		y.logger.Error(
 			"failed to insert yookassa payment ids into prod service",

@@ -51,9 +51,24 @@ func (c *HTTPClient) Get(ctx context.Context, path string, out any) error {
 	return json.Unmarshal(body, out)
 }
 
-func (c *HTTPClient) Post(ctx context.Context, path string, body any) error {
+func (c *HTTPClient) Patch(ctx context.Context, path string, body any) error {
 	b, _ := json.Marshal(body)
-	return c.PostRaw(ctx, path, "application/json", bytes.NewReader(b))
+	req, _ := http.NewRequestWithContext(ctx, "PATCH", c.baseURL+path, bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+
+	c.applyHeadersAndMiddleware(req)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("http %d: %s", resp.StatusCode, string(b))
+	}
+	return nil
 }
 
 func (c *HTTPClient) PostRaw(ctx context.Context, path string, contentType string, body io.Reader) error {

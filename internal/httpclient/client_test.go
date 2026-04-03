@@ -72,9 +72,9 @@ func TestHTTPClient_PostRaw(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestHTTPClient_Post(t *testing.T) {
+func TestHTTPClient_Patch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "POST", r.Method)
+		require.Equal(t, "PATCH", r.Method)
 		require.Equal(t, testURL, r.URL.Path)
 
 		var body map[string]int
@@ -86,7 +86,7 @@ func TestHTTPClient_Post(t *testing.T) {
 
 	p := getHttpClient(&http.Client{}, server.URL)
 
-	err := p.Post(context.Background(), testURL, map[string]int{"id": 123})
+	err := p.Patch(context.Background(), testURL, map[string]int{"id": 123})
 	require.NoError(t, err)
 }
 

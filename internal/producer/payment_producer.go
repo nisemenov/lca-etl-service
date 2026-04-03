@@ -18,7 +18,7 @@ type paymentProducer struct {
 func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 	var resp fetchPaymentsResponse
 
-	err := p.http.Get(ctx, FetchPaymentsPath, &resp)
+	err := p.http.Get(ctx, PaymentsPath, &resp)
 	if err != nil {
 		p.logger.Error(
 			"failed to fetch payment data",
@@ -71,7 +71,7 @@ func (p *paymentProducer) Acknowledge(ctx context.Context, ids []domain.PaymentI
 		return nil
 	}
 
-	err := p.http.Post(ctx, AckPaymentsPath, ackPaymentRequest{IDs: ids})
+	err := p.http.Patch(ctx, PaymentsPath, ackPaymentRequest{IDs: ids})
 	if err != nil {
 		p.logger.Error(
 			"failed to insert payment ids into prod service",

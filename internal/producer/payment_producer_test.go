@@ -18,7 +18,8 @@ import (
 func TestPaymentProducer_Fetch_OK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "GET", r.Method)
-		require.Equal(t, FetchPaymentsPath, r.URL.Path)
+		require.Equal(t, "/payments/", r.URL.Path)
+		require.Equal(t, "target=ch", r.URL.RawQuery)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{
@@ -139,8 +140,9 @@ func TestPaymentProducer_Fetch_InvalidJSON(t *testing.T) {
 
 func TestPaymentProducer_Acknowledge_OK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "POST", r.Method)
-		require.Equal(t, AckPaymentsPath, r.URL.Path)
+		require.Equal(t, "PATCH", r.Method)
+		require.Equal(t, "/payments/", r.URL.Path)
+		require.Equal(t, "target=ch", r.URL.RawQuery)
 
 		var body struct {
 			IDs []int `json:"ids"`
@@ -158,7 +160,7 @@ func TestPaymentProducer_Acknowledge_OK(t *testing.T) {
 
 func TestPaymentProducer_Acknowledge_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "POST", r.Method)
+		require.Equal(t, "PATCH", r.Method)
 
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error":"db down"}`))

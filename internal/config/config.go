@@ -36,10 +36,10 @@ type Config struct {
 }
 
 func Load() *Config {
-	err := godotenv.Load()
-	if err != nil {
-		panic(err)
-	}
+	_ = godotenv.Load()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	config := &Config{
 		DBPath:                getEnv("DB_PATH", ""),

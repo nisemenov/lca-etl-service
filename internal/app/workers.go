@@ -78,7 +78,7 @@ func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker
 
 	// workers
 	return []*worker.Worker{
-		worker.NewWorker(paymentEtl, 1*time.Minute, logger.With("component", "payment worker")),
-		worker.NewWorker(yooPaymentEtl, 1*time.Minute, logger.With("component", "yookassa payment worker")),
+		worker.NewWorker(paymentEtl, 30*time.Minute, logger.With("component", "payment worker")),
+		worker.NewWorker(yooPaymentEtl, 30*time.Minute, logger.With("component", "yookassa payment worker")),
 	}
 }

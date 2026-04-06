@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// EtlPipline is the common interface for Worker.etlPipline and JobFunc
 type EtlPipline interface {
 	Run(ctx context.Context) error
 }

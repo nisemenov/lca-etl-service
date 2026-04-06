@@ -1,6 +1,6 @@
 // Package app
 //
-// workers.go contains wiring logic for building ETL workers.
+// contains wiring logic for building ETL workers.
 //
 // The file is responsible for creating producers, repositories,
 // consumers and assembling them into ETL pipelines that are
@@ -62,23 +62,40 @@ func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker
 		logger.With("component", "yookassa payment consumer"),
 	)
 
+	// repos
+	paymentRepo := repository.NewSQLitePaymentRepo(db, logger.With("component", "payment repository"))
+	yooPaymentRepo := repository.NewSQLiteYooPaymentRepo(db, logger.With("component", "yookassa payment repository"))
+
 	// etl piplines
 	paymentEtl := etl.NewETLPipline(
 		producer.NewPaymentProducer(apiClient, logger.With("component", "payment producer")),
-		repository.NewSQLitePaymentRepo(db, logger.With("component", "payment repository")),
+		paymentRepo,
 		paymentConsumer,
 		logger.With("component", "payment etl"),
 	)
 	yooPaymentEtl := etl.NewETLPipline(
 		producer.NewYooPaymentProducer(apiClient, logger.With("component", "yookassa payment producer")),
-		repository.NewSQLiteYooPaymentRepo(db, logger.With("component", "yookassa payment repository")),
+		yooPaymentRepo,
 		yooPaymentConsumer,
 		logger.With("component", "yookassa payment etl"),
 	)
 
-	// workers
+	// job workers
+	cleanupPayWorker := worker.NewWorker(
+		worker.JobFunc(paymentRepo.DeleteExported),
+		24*time.Hour,
+		logger.With("component", "payment delete exported worker"),
+	)
+	cleanupYooPayWorker := worker.NewWorker(
+		worker.JobFunc(yooPaymentRepo.DeleteExported),
+		24*time.Hour,
+		logger.With("component", "yookassa payment delete exported worker"),
+	)
+
 	return []*worker.Worker{
 		worker.NewWorker(paymentEtl, 30*time.Minute, logger.With("component", "payment worker")),
 		worker.NewWorker(yooPaymentEtl, 30*time.Minute, logger.With("component", "yookassa payment worker")),
+		cleanupPayWorker,
+		cleanupYooPayWorker,
 	}
 }

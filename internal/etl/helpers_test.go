@@ -49,9 +49,7 @@ func (r *mockRepo) MarkStatus(ctx context.Context, ids []int, status EtlStatus) 
 	return r.err
 }
 
-func (r *mockRepo) DeleteExported(ctx context.Context) error {
-	return nil
-}
+func (r *mockRepo) DeleteExported(ctx context.Context) error { return nil }
 
 type mockConsumer struct {
 	insertedBatch []string

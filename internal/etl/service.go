@@ -8,14 +8,14 @@ import (
 	"log/slog"
 )
 
-type etlPipline[D any, ID comparable] struct {
+type etlPipeline[D any, ID comparable] struct {
 	producer Producer[D, ID]
 	repo     Repository[D, ID]
 	consumer Consumer[D]
 	logger   *slog.Logger
 }
 
-func (etl *etlPipline[D, ID]) Run(ctx context.Context) error {
+func (etl *etlPipeline[D, ID]) Run(ctx context.Context) error {
 	if err := etl.fetch(ctx); err != nil {
 		etl.logger.Error("fetch stage failed", "err", err)
 		return err
@@ -34,7 +34,7 @@ func (etl *etlPipline[D, ID]) Run(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipline[D, ID]) fetch(ctx context.Context) error {
+func (etl *etlPipeline[D, ID]) fetch(ctx context.Context) error {
 	instances, err := etl.producer.Fetch(ctx)
 	if err != nil {
 		return fmt.Errorf("producer fetch failed: %w", err)
@@ -52,7 +52,7 @@ func (etl *etlPipline[D, ID]) fetch(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipline[D, ID]) process(ctx context.Context) error {
+func (etl *etlPipeline[D, ID]) process(ctx context.Context) error {
 	ids, instances, err := etl.repo.FetchForProcessing(ctx)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
@@ -82,7 +82,7 @@ func (etl *etlPipline[D, ID]) process(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipline[D, ID]) acknowledge(ctx context.Context) error {
+func (etl *etlPipeline[D, ID]) acknowledge(ctx context.Context) error {
 	ids, err := etl.repo.FetchSentIds(ctx)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
@@ -105,11 +105,11 @@ func (etl *etlPipline[D, ID]) acknowledge(ctx context.Context) error {
 	return nil
 }
 
-func NewETLPipline[D any, ID comparable](
+func NewETLPipeline[D any, ID comparable](
 	producer Producer[D, ID],
 	repo Repository[D, ID],
 	consumer Consumer[D],
 	logger *slog.Logger,
-) *etlPipline[D, ID] {
-	return &etlPipline[D, ID]{producer: producer, repo: repo, consumer: consumer, logger: logger}
+) *etlPipeline[D, ID] {
+	return &etlPipeline[D, ID]{producer: producer, repo: repo, consumer: consumer, logger: logger}
 }

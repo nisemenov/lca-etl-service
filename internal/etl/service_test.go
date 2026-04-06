@@ -16,7 +16,7 @@ func TestETL_Fetch_OK(t *testing.T) {
 	consumer := &mockConsumer{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(producer, repo, consumer, logger)
+	etl := NewETLPipeline(producer, repo, consumer, logger)
 
 	err := etl.fetch(context.Background())
 	require.NoError(t, err)
@@ -29,7 +29,7 @@ func TestETL_Fetch_Error(t *testing.T) {
 	consumer := &mockConsumer{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(producer, repo, consumer, logger)
+	etl := NewETLPipeline(producer, repo, consumer, logger)
 
 	err := etl.fetch(context.Background())
 	require.Error(t, err)
@@ -41,7 +41,7 @@ func TestETL_Save_Error(t *testing.T) {
 	consumer := &mockConsumer{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(producer, repo, consumer, logger)
+	etl := NewETLPipeline(producer, repo, consumer, logger)
 
 	err := etl.fetch(context.Background())
 	require.Error(t, err)
@@ -52,7 +52,7 @@ func TestETL_Process_OK(t *testing.T) {
 	consumer := &mockConsumer{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(nil, repo, consumer, logger)
+	etl := NewETLPipeline(nil, repo, consumer, logger)
 
 	err := etl.process(context.Background())
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestETL_Process_CH_Error(t *testing.T) {
 	consumer := &mockConsumer{err: errors.New("CH error")}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(nil, repo, consumer, logger)
+	etl := NewETLPipeline(nil, repo, consumer, logger)
 
 	err := etl.process(context.Background())
 	require.Error(t, err)
@@ -79,7 +79,7 @@ func TestAcknowledge_OK(t *testing.T) {
 	repo := &mockRepo{sentIds: []int{1}, etlStatus: StatusSent}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(producer, repo, nil, logger)
+	etl := NewETLPipeline(producer, repo, nil, logger)
 
 	err := etl.acknowledge(ctx)
 
@@ -93,7 +93,7 @@ func TestAcknowledge_NoRecords(t *testing.T) {
 	repo := &mockRepo{etlStatus: StatusSent}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(producer, repo, nil, logger)
+	etl := NewETLPipeline(producer, repo, nil, logger)
 
 	err := etl.acknowledge(context.Background())
 
@@ -108,7 +108,7 @@ func TestETL_Run_OK(t *testing.T) {
 	consumer := &mockConsumer{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	etl := NewETLPipline(producer, repo, consumer, logger)
+	etl := NewETLPipeline(producer, repo, consumer, logger)
 
 	err := etl.Run(context.Background())
 	require.NoError(t, err)

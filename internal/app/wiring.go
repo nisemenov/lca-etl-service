@@ -66,14 +66,14 @@ func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker
 	paymentRepo := repository.NewSQLitePaymentRepo(db, logger.With("component", "payment repository"))
 	yooPaymentRepo := repository.NewSQLiteYooPaymentRepo(db, logger.With("component", "yookassa payment repository"))
 
-	// etl piplines
-	paymentEtl := etl.NewETLPipline(
+	// etl pipelines
+	paymentEtl := etl.NewETLPipeline(
 		producer.NewPaymentProducer(apiClient, logger.With("component", "payment producer")),
 		paymentRepo,
 		paymentConsumer,
 		logger.With("component", "payment etl"),
 	)
-	yooPaymentEtl := etl.NewETLPipline(
+	yooPaymentEtl := etl.NewETLPipeline(
 		producer.NewYooPaymentProducer(apiClient, logger.With("component", "yookassa payment producer")),
 		yooPaymentRepo,
 		yooPaymentConsumer,

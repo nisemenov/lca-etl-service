@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-// EtlPipline is the common interface for Worker.etlPipline and JobFunc
-type EtlPipline interface {
+// EtlPipeline is the common interface for Worker.etlPipeline and JobFunc
+type EtlPipeline interface {
 	Run(ctx context.Context) error
 }
 
 type Worker struct {
-	etlPipline EtlPipline
-	interval   time.Duration
-	logger     *slog.Logger
+	etlPipeline EtlPipeline
+	interval    time.Duration
+	logger      *slog.Logger
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -29,17 +29,17 @@ func (w *Worker) Run(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			if err := w.etlPipline.Run(ctx); err != nil {
-				w.logger.Error("etl pipline failed", "err", err)
+			if err := w.etlPipeline.Run(ctx); err != nil {
+				w.logger.Error("etl pipeline failed", "err", err)
 			}
 		}
 	}
 }
 
-func NewWorker(etl EtlPipline, interval time.Duration, logger *slog.Logger) *Worker {
+func NewWorker(etl EtlPipeline, interval time.Duration, logger *slog.Logger) *Worker {
 	return &Worker{
-		etlPipline: etl,
-		interval:   interval,
-		logger:     logger,
+		etlPipeline: etl,
+		interval:    interval,
+		logger:      logger,
 	}
 }

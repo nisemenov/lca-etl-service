@@ -32,15 +32,15 @@ func (r *mockRepo) SaveBatch(ctx context.Context, batch []string) error {
 	return r.err
 }
 
-func (r *mockRepo) FetchForProcessing(ctx context.Context, limit int) ([]int, []string, error) {
+func (r *mockRepo) FetchForProcessing(ctx context.Context) ([]int, []string, error) {
 	return r.newIds, r.batch, r.err
 }
 
-func (r *mockRepo) FetchSentIds(ctx context.Context, limit int) ([]int, error) {
+func (r *mockRepo) FetchSentIds(ctx context.Context) ([]int, error) {
 	return r.sentIds, nil
 }
 
-func (r *mockRepo) FetchProcessed(ctx context.Context, limit int) ([]int, []string, error) {
+func (r *mockRepo) FetchProcessed(ctx context.Context) ([]int, []string, error) {
 	return nil, nil, nil
 }
 

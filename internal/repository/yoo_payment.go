@@ -91,7 +91,6 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 // возвращает батч со status == StatusNew, потому что в CH они не вставляются
 func (r *sqliteYooPaymentRepo) FetchForProcessing(
 	ctx context.Context,
-	limit int,
 ) ([]domain.YooPaymentID, []domain.YooPayment, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -99,7 +98,7 @@ func (r *sqliteYooPaymentRepo) FetchForProcessing(
 	}
 	defer tx.Rollback()
 
-	payments, err := r.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew, limit)
+	payments, err := r.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -126,14 +125,14 @@ func (r *sqliteYooPaymentRepo) FetchForProcessing(
 	return ids, payments, nil
 }
 
-func (r *sqliteYooPaymentRepo) FetchSentIds(ctx context.Context, limit int) ([]domain.YooPaymentID, error) {
+func (r *sqliteYooPaymentRepo) FetchSentIds(ctx context.Context) ([]domain.YooPaymentID, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	payments, err := r.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusSent, limit)
+	payments, err := r.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusSent)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +152,6 @@ func (r *sqliteYooPaymentRepo) FetchSentIds(ctx context.Context, limit int) ([]d
 // retry logic
 func (r *sqliteYooPaymentRepo) FetchProcessed(
 	ctx context.Context,
-	limit int,
 ) ([]domain.YooPaymentID, []domain.YooPayment, error) {
 	return nil, nil, nil
 }
@@ -200,7 +198,6 @@ func (r *sqliteYooPaymentRepo) fetchYooPaymentsOnStatus(
 	ctx context.Context,
 	tx *sql.Tx,
 	status etl.EtlStatus,
-	limit int,
 ) ([]domain.YooPayment, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT
@@ -221,9 +218,7 @@ func (r *sqliteYooPaymentRepo) fetchYooPaymentsOnStatus(
 			updated_at
         FROM yookassa
         WHERE status = ?
-        ORDER BY created_at ASC
-        LIMIT ?
-	`, status, limit)
+	`, status)
 	if err != nil {
 		return nil, err
 	}

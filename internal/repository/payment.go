@@ -87,7 +87,6 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 // возвращает батч со status == StatusNew, потому что в CH они не вставляются
 func (r *sqlitePaymentRepo) FetchForProcessing(
 	ctx context.Context,
-	limit int,
 ) ([]domain.PaymentID, []domain.Payment, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -95,7 +94,7 @@ func (r *sqlitePaymentRepo) FetchForProcessing(
 	}
 	defer tx.Rollback()
 
-	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew, limit)
+	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -122,14 +121,14 @@ func (r *sqlitePaymentRepo) FetchForProcessing(
 	return ids, payments, nil
 }
 
-func (r *sqlitePaymentRepo) FetchSentIds(ctx context.Context, limit int) ([]domain.PaymentID, error) {
+func (r *sqlitePaymentRepo) FetchSentIds(ctx context.Context) ([]domain.PaymentID, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusSent, limit)
+	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusSent)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +148,6 @@ func (r *sqlitePaymentRepo) FetchSentIds(ctx context.Context, limit int) ([]doma
 // retry logic
 func (r *sqlitePaymentRepo) FetchProcessed(
 	ctx context.Context,
-	limit int,
 ) ([]domain.PaymentID, []domain.Payment, error) {
 	return nil, nil, nil
 }
@@ -196,7 +194,6 @@ func (r *sqlitePaymentRepo) fetchPaymentsOnStatus(
 	ctx context.Context,
 	tx *sql.Tx,
 	status etl.EtlStatus,
-	limit int,
 ) ([]domain.Payment, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT 
@@ -215,9 +212,7 @@ func (r *sqlitePaymentRepo) fetchPaymentsOnStatus(
 			updated_at
         FROM payments
         WHERE status = ?
-        ORDER BY created_at ASC
-        LIMIT ?
-	`, status, limit)
+	`, status)
 	if err != nil {
 		return nil, err
 	}

@@ -11,9 +11,9 @@ type Producer[D any, ID comparable] interface {
 
 type Repository[D any, ID comparable] interface {
 	SaveBatch(ctx context.Context, batch []D) error
-	FetchForProcessing(ctx context.Context, limit int) ([]ID, []D, error)
-	FetchProcessed(ctx context.Context, limit int) ([]ID, []D, error)
-	FetchSentIds(ctx context.Context, limit int) ([]ID, error)
+	FetchForProcessing(ctx context.Context) ([]ID, []D, error)
+	FetchProcessed(ctx context.Context) ([]ID, []D, error)
+	FetchSentIds(ctx context.Context) ([]ID, error)
 	MarkStatus(ctx context.Context, ids []ID, status EtlStatus) error
 }
 

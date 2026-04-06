@@ -8,11 +8,6 @@ import (
 	"log/slog"
 )
 
-const (
-	fetchForProcessingLimit = 1000
-	fetchSentIdsLimit       = 1000
-)
-
 type etlPipline[D any, ID comparable] struct {
 	producer Producer[D, ID]
 	repo     Repository[D, ID]
@@ -58,7 +53,7 @@ func (etl *etlPipline[D, ID]) fetch(ctx context.Context) error {
 }
 
 func (etl *etlPipline[D, ID]) process(ctx context.Context) error {
-	ids, instances, err := etl.repo.FetchForProcessing(ctx, fetchForProcessingLimit)
+	ids, instances, err := etl.repo.FetchForProcessing(ctx)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}
@@ -86,7 +81,7 @@ func (etl *etlPipline[D, ID]) process(ctx context.Context) error {
 }
 
 func (etl *etlPipline[D, ID]) acknowledge(ctx context.Context) error {
-	ids, err := etl.repo.FetchSentIds(ctx, fetchSentIdsLimit)
+	ids, err := etl.repo.FetchSentIds(ctx)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}

@@ -22,7 +22,7 @@ func TestYooPaymentRepo_SaveBatch(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	payments, err := repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew, 10)
+	payments, err := repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
 	require.Equal(t, domain.YooPaymentID(1), payments[0].ID)
@@ -40,7 +40,7 @@ func TestYooPaymentRepo_SaveBatch_Empty(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	payments, err := repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew, 10)
+	payments, err := repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	require.NoError(t, err)
 	require.Len(t, payments, 0)
 }
@@ -65,7 +65,7 @@ func TestYooPaymentRepo_FetchForProcessing(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
-	_, payments, err := repo.FetchForProcessing(ctx, 10)
+	_, payments, err := repo.FetchForProcessing(ctx)
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
 	require.NoError(t, payments[0].Validate())
@@ -74,7 +74,7 @@ func TestYooPaymentRepo_FetchForProcessing(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	_, err = repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusProcessing, 10)
+	_, err = repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
 	require.NoError(t, err)
 }
 
@@ -85,7 +85,7 @@ func TestYooPaymentRepo_FetchSentIds(t *testing.T) {
 	err := saveYooPaymentBatch(ctx, repo, []domain.YooPayment{{ID: 1, Status: etl.StatusSent}})
 	require.NoError(t, err)
 
-	ids, err := repo.FetchSentIds(ctx, 10)
+	ids, err := repo.FetchSentIds(ctx)
 	require.NoError(t, err)
 	require.Len(t, ids, 1)
 	require.Equal(t, domain.YooPaymentID(1), ids[0])
@@ -97,8 +97,8 @@ func TestYooPaymentRepo_FetchForProcessing_Atomic(t *testing.T) {
 
 	repo.SaveBatch(ctx, []domain.YooPayment{{ID: 1}})
 
-	_, batch1, _ := repo.FetchForProcessing(ctx, 10)
-	_, batch2, _ := repo.FetchForProcessing(ctx, 10)
+	_, batch1, _ := repo.FetchForProcessing(ctx)
+	_, batch2, _ := repo.FetchForProcessing(ctx)
 
 	require.Len(t, batch1, 1)
 	require.Len(t, batch2, 0)
@@ -116,11 +116,11 @@ func TestYooPaymentRepo_MarkStatus(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	payments, err := repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew, 10)
+	payments, err := repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	require.NoError(t, err)
 	require.Len(t, payments, 0)
 
-	payments, err = repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusProcessing, 10)
+	payments, err = repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
 }

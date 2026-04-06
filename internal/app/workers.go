@@ -28,7 +28,14 @@ func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker
 	baseHTTP := &http.Client{
 		Timeout: 60 * time.Second,
 	}
-	apiClient := httpclient.NewHTTPClient(baseHTTP, cfg.APIBaseURL, logger.With("component", "httpclient"))
+	apiClient := httpclient.NewHTTPClient(
+		baseHTTP,
+		cfg.APIBaseURL,
+		logger.With("component", "httpclient"),
+		httpclient.WithHeaders(
+			map[string]string{"Authorization": cfg.AuthToken},
+		),
+	)
 	chClient := httpclient.NewHTTPClient(
 		baseHTTP,
 		fmt.Sprintf("http://%s:%s", cfg.ClickHouseHost, cfg.ClickHousePort),

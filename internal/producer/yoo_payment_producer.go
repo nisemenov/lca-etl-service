@@ -24,11 +24,11 @@ func (y *yooPaymentProducer) Fetch(ctx context.Context) ([]domain.YooPayment, er
 			"failed to fetch yookassa payment data",
 			"err", err,
 		)
-		return nil, err
+		return []domain.YooPayment{}, err
 	}
 	if len(resp.Data) == 0 {
 		y.logger.Info("no new yookassa payments data to export")
-		return nil, nil
+		return []domain.YooPayment{}, nil
 	}
 
 	// fill in output with validated data
@@ -60,7 +60,7 @@ func (y *yooPaymentProducer) Fetch(ctx context.Context) ([]domain.YooPayment, er
 	}
 	if len(response) == 0 {
 		y.logger.Warn("all yookassa payments invalid")
-		return nil, err
+		return []domain.YooPayment{}, err
 	}
 
 	y.logger.Info("yookassa payments fetched successfully", "count", len(response))

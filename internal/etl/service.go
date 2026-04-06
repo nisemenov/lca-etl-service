@@ -39,7 +39,7 @@ func (etl *etlPipline[D, ID]) fetch(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("producer fetch failed: %w", err)
 	}
-	if instances == nil {
+	if len(instances) == 0 {
 		etl.logger.Info("no instances fetched from producer")
 		return nil
 	}
@@ -62,6 +62,8 @@ func (etl *etlPipline[D, ID]) process(ctx context.Context) error {
 		etl.logger.Info("no instances for processing")
 		return nil
 	}
+
+	// TODO: TTL for StatusProcessing instances
 
 	if err := etl.consumer.InsertBatch(ctx, instances); err != nil {
 		if err2 := etl.repo.MarkStatus(ctx, ids, StatusFailed); err2 != nil {

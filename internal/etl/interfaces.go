@@ -15,6 +15,7 @@ type Repository[D any, ID comparable] interface {
 	FetchProcessed(ctx context.Context) ([]ID, []D, error)
 	FetchSentIds(ctx context.Context) ([]ID, error)
 	MarkStatus(ctx context.Context, ids []ID, status EtlStatus) error
+	DeleteExported(ctx context.Context) error
 }
 
 type Consumer[D any] interface {

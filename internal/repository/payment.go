@@ -165,6 +165,39 @@ func (r *sqlitePaymentRepo) MarkStatus(ctx context.Context, ids []domain.Payment
 	return tx.Commit()
 }
 
+// DeleteExported deletes all StatusExported instances created earlier than 7 days
+func (r *sqlitePaymentRepo) DeleteExported(ctx context.Context) error {
+	r.logger.Info("starting cleanup of exported payments")
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		DELETE FROM payments
+		WHERE status = ?
+		AND created_at < datetime('now', '-7 days')
+	`, etl.StatusExported)
+	if err != nil {
+		return err
+	}
+
+	affected, _ := res.RowsAffected()
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	r.logger.Info(
+		"exported payments deleted",
+		"count", affected,
+	)
+
+	return nil
+}
+
 func (r *sqlitePaymentRepo) markStatusTx(
 	ctx context.Context,
 	tx *sql.Tx,

@@ -122,3 +122,22 @@ func TestPaymentRepo_MarkStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
 }
+
+func TestPaymentRepo_DeleteExported(t *testing.T) {
+	ctx := context.Background()
+	repo := NewTestSQLitePaymentRepo(t)
+
+	savePaymentBatch(ctx, repo, []domain.Payment{{ID: 1, Status: etl.StatusExported}, {ID: 2, Status: etl.StatusExported}})
+	tx, _ := repo.db.BeginTx(ctx, nil)
+	tx.ExecContext(ctx, `UPDATE payments SET created_at = ? WHERE id = 1`, time.Now().AddDate(0, 0, -8))
+	tx.Commit()
+
+	err := repo.DeleteExported(ctx)
+	require.NoError(t, err)
+
+	tx, _ = repo.db.BeginTx(ctx, nil)
+	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusExported)
+	require.NoError(t, err)
+	require.Len(t, payments, 1)
+	require.Equal(t, domain.PaymentID(2), payments[0].ID)
+}

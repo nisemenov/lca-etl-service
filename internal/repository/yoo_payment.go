@@ -169,6 +169,39 @@ func (r *sqliteYooPaymentRepo) MarkStatus(ctx context.Context, ids []domain.YooP
 	return tx.Commit()
 }
 
+// DeleteExported deletes all StatusExported instances created earlier than 7 days
+func (r *sqliteYooPaymentRepo) DeleteExported(ctx context.Context) error {
+	r.logger.Info("starting cleanup of exported yookassa payments")
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		DELETE FROM yookassa
+		WHERE status = ?
+		AND created_at < datetime('now', '-7 days')
+	`, etl.StatusExported)
+	if err != nil {
+		return err
+	}
+
+	affected, _ := res.RowsAffected()
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	r.logger.Info(
+		"exported yookassa payments deleted",
+		"count", affected,
+	)
+
+	return nil
+}
+
 func (r *sqliteYooPaymentRepo) markStatusTx(
 	ctx context.Context,
 	tx *sql.Tx,

@@ -87,21 +87,21 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 // возвращает батч со status == StatusNew, потому что в CH они не вставляются
 func (r *sqlitePaymentRepo) FetchForProcessing(
 	ctx context.Context,
-) ([]domain.PaymentID, []domain.Payment, error) {
+) (*etl.Batch[domain.PaymentID, domain.Payment], error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, nil, err
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, err
 	}
 	defer tx.Rollback()
 
 	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	if err != nil {
-		return nil, nil, err
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, err
 	}
 
 	if len(payments) == 0 {
 		r.logger.Info("empty batch for FetchForProcessing")
-		return nil, nil, nil
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, nil
 	}
 
 	ids := make([]domain.PaymentID, 0, len(payments))
@@ -110,46 +110,42 @@ func (r *sqlitePaymentRepo) FetchForProcessing(
 	}
 
 	if err := r.markStatusTx(ctx, tx, ids, etl.StatusProcessing); err != nil {
-		return nil, nil, err
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, nil, err
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, err
 	}
 
 	r.logger.Info("payments fetched for processing successfully", "count", len(ids))
-	return ids, payments, nil
+	return &etl.Batch[domain.PaymentID, domain.Payment]{IDs: ids, Items: payments}, nil
 }
 
-func (r *sqlitePaymentRepo) FetchSentIds(ctx context.Context) ([]domain.PaymentID, error) {
+func (r *sqlitePaymentRepo) FetchByStatus(
+	ctx context.Context,
+	status etl.EtlStatus,
+) (*etl.Batch[domain.PaymentID, domain.Payment], error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, err
 	}
 	defer tx.Rollback()
 
-	payments, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusSent)
+	instances, err := r.fetchPaymentsOnStatus(ctx, tx, status)
 	if err != nil {
-		return nil, err
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, err
 	}
 
-	if len(payments) == 0 {
-		r.logger.Info("empty batch for FetchSentIds")
-		return nil, nil
+	if len(instances) == 0 {
+		r.logger.Info(fmt.Sprintf("no payment instances with %s found", status))
+		return &etl.Batch[domain.PaymentID, domain.Payment]{}, nil
 	}
 
-	ids := make([]domain.PaymentID, 0, len(payments))
-	for _, p := range payments {
+	ids := make([]domain.PaymentID, 0, len(instances))
+	for _, p := range instances {
 		ids = append(ids, p.ID)
 	}
-	return ids, nil
-}
-
-// retry logic
-func (r *sqlitePaymentRepo) FetchProcessed(
-	ctx context.Context,
-) ([]domain.PaymentID, []domain.Payment, error) {
-	return nil, nil, nil
+	return &etl.Batch[domain.PaymentID, domain.Payment]{IDs: ids, Items: instances}, nil
 }
 
 func (r *sqlitePaymentRepo) MarkStatus(ctx context.Context, ids []domain.PaymentID, status etl.EtlStatus) error {

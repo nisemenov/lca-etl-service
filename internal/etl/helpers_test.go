@@ -32,16 +32,12 @@ func (r *mockRepo) SaveBatch(ctx context.Context, batch []string) error {
 	return r.err
 }
 
-func (r *mockRepo) FetchForProcessing(ctx context.Context) ([]int, []string, error) {
-	return r.newIds, r.batch, r.err
+func (r *mockRepo) FetchForProcessing(ctx context.Context) (*Batch[int, string], error) {
+	return &Batch[int, string]{r.newIds, r.batch}, r.err
 }
 
-func (r *mockRepo) FetchSentIds(ctx context.Context) ([]int, error) {
-	return r.sentIds, nil
-}
-
-func (r *mockRepo) FetchProcessed(ctx context.Context) ([]int, []string, error) {
-	return nil, nil, nil
+func (r *mockRepo) FetchByStatus(ctx context.Context, status EtlStatus) (*Batch[int, string], error) {
+	return &Batch[int, string]{IDs: r.sentIds, Items: nil}, nil
 }
 
 func (r *mockRepo) MarkStatus(ctx context.Context, ids []int, status EtlStatus) error {

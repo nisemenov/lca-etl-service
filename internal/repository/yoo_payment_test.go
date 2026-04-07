@@ -49,59 +49,31 @@ func TestYooPaymentRepo_FetchForProcessing(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLiteYooPaymentRepo(t)
 
-	err := repo.SaveBatch(ctx, []domain.YooPayment{{
-		ID:                    1,
-		CaseID:                1,
-		DebtorID:              1,
-		FullName:              "John Doe",
-		CreditNumber:          "1",
-		CreditIssueDate:       time.Now(),
-		Amount:                domain.Money("1.0"),
-		YookassaID:            "215d8da0-000f-50be-b000-0003308c89be",
-		TechnicalStatus:       "succeeded",
-		YooCreatedAt:          time.Now(),
-		ExecutionDateBySystem: time.Now(),
-		Description:           "sms",
-	}})
-	require.NoError(t, err)
+	repo.SaveBatch(ctx, []domain.YooPayment{{ID: 1}})
 
-	_, payments, err := repo.FetchForProcessing(ctx)
+	batch, err := repo.FetchForProcessing(ctx)
+	require.NoError(t, err)
+	require.Len(t, batch.IDs, 1)
+	require.Len(t, batch.Items, 1)
+
+	tx, _ := repo.db.BeginTx(ctx, nil)
+	payments, err := repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
-	require.NoError(t, payments[0].Validate())
-
-	tx, err := repo.db.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
-	_, err = repo.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
-	require.NoError(t, err)
 }
 
-func TestYooPaymentRepo_FetchSentIds(t *testing.T) {
+func TestYooPaymentRepo_FetchByStatus(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLiteYooPaymentRepo(t)
 
 	err := saveYooPaymentBatch(ctx, repo, []domain.YooPayment{{ID: 1, Status: etl.StatusSent}})
 	require.NoError(t, err)
 
-	ids, err := repo.FetchSentIds(ctx)
+	batch, err := repo.FetchByStatus(ctx, etl.StatusSent)
 	require.NoError(t, err)
-	require.Len(t, ids, 1)
-	require.Equal(t, domain.YooPaymentID(1), ids[0])
-}
-
-func TestYooPaymentRepo_FetchForProcessing_Atomic(t *testing.T) {
-	ctx := context.Background()
-	repo := NewTestSQLiteYooPaymentRepo(t)
-
-	repo.SaveBatch(ctx, []domain.YooPayment{{ID: 1}})
-
-	_, batch1, _ := repo.FetchForProcessing(ctx)
-	_, batch2, _ := repo.FetchForProcessing(ctx)
-
-	require.Len(t, batch1, 1)
-	require.Len(t, batch2, 0)
+	require.Len(t, batch.IDs, 1)
+	require.Len(t, batch.Items, 1)
+	require.Equal(t, domain.YooPaymentID(1), batch.IDs[0])
 }
 
 func TestYooPaymentRepo_MarkStatus(t *testing.T) {

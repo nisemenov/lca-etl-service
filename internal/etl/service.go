@@ -8,9 +8,9 @@ import (
 	"log/slog"
 )
 
-type etlPipeline[D any, ID comparable] struct {
-	producer Producer[D, ID]
-	repo     Repository[D, ID]
+type etlPipeline[ID comparable, D any] struct {
+	producer Producer[ID, D]
+	repo     Repository[ID, D]
 	consumer Consumer[D]
 	logger   *slog.Logger
 }
@@ -53,40 +53,41 @@ func (etl *etlPipeline[D, ID]) fetch(ctx context.Context) error {
 }
 
 func (etl *etlPipeline[D, ID]) process(ctx context.Context) error {
-	ids, instances, err := etl.repo.FetchForProcessing(ctx)
+	batch, err := etl.repo.FetchForProcessing(ctx)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}
 
-	if len(instances) == 0 {
+	if len(batch.Items) == 0 {
 		etl.logger.Info("no instances for processing")
 		return nil
 	}
 
 	// TODO: TTL for StatusProcessing instances
 
-	if err := etl.consumer.InsertBatch(ctx, instances); err != nil {
-		if err2 := etl.repo.MarkStatus(ctx, ids, StatusFailed); err2 != nil {
+	if err := etl.consumer.InsertBatch(ctx, batch.Items); err != nil {
+		if err2 := etl.repo.MarkStatus(ctx, batch.IDs, StatusFailed); err2 != nil {
 			etl.logger.Error("failed to mark instances as failed", "err", err2)
 		} else {
-			etl.logger.Warn("batch marked as failed", "ids", ids)
+			etl.logger.Warn("batch marked as failed", "ids", batch.IDs)
 		}
 		return fmt.Errorf("clickhouse insert failed: %w", err)
 	}
 
-	if err := etl.repo.MarkStatus(ctx, ids, StatusSent); err != nil {
+	if err := etl.repo.MarkStatus(ctx, batch.IDs, StatusSent); err != nil {
 		return fmt.Errorf("mark sent failed: %w", err)
 	}
 
-	etl.logger.Info("instances inserted into clickhouse", "count", len(instances))
+	etl.logger.Info("instances inserted into clickhouse", "count", len(batch.Items))
 	return nil
 }
 
 func (etl *etlPipeline[D, ID]) acknowledge(ctx context.Context) error {
-	ids, err := etl.repo.FetchSentIds(ctx)
+	batch, err := etl.repo.FetchByStatus(ctx, StatusSent)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}
+	ids := batch.IDs
 
 	if len(ids) == 0 {
 		etl.logger.Info("no instances to acknowledge")
@@ -105,11 +106,11 @@ func (etl *etlPipeline[D, ID]) acknowledge(ctx context.Context) error {
 	return nil
 }
 
-func NewETLPipeline[D any, ID comparable](
-	producer Producer[D, ID],
-	repo Repository[D, ID],
+func NewETLPipeline[ID comparable, D any](
+	producer Producer[ID, D],
+	repo Repository[ID, D],
 	consumer Consumer[D],
 	logger *slog.Logger,
-) *etlPipeline[D, ID] {
-	return &etlPipeline[D, ID]{producer: producer, repo: repo, consumer: consumer, logger: logger}
+) *etlPipeline[ID, D] {
+	return &etlPipeline[ID, D]{producer: producer, repo: repo, consumer: consumer, logger: logger}
 }

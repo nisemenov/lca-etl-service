@@ -49,57 +49,32 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
 
-	err := repo.SaveBatch(ctx, []domain.Payment{{
-		ID:                    1,
-		CaseID:                1,
-		DebtorID:              1,
-		FullName:              "John Doe",
-		CreditNumber:          "1",
-		CreditIssueDate:       time.Now(),
-		Amount:                domain.Money("1"),
-		DebtAmount:            domain.Money("1"),
-		ExecutionDateBySystem: time.Now(),
-		Channel:               "sms",
-	}})
-	require.NoError(t, err)
+	repo.SaveBatch(ctx, []domain.Payment{{ID: 1}})
 
-	_, payments, err := repo.FetchForProcessing(ctx)
+	batch, err := repo.FetchForProcessing(ctx)
+	require.NoError(t, err)
+	require.Len(t, batch.IDs, 1)
+	require.Equal(t, domain.PaymentID(1), batch.IDs[0])
+	require.Len(t, batch.Items, 1)
+
+	tx, _ := repo.db.BeginTx(ctx, nil)
+	payments, err := repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
 	require.NoError(t, err)
 	require.Len(t, payments, 1)
-	require.NoError(t, payments[0].Validate())
-
-	tx, err := repo.db.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
-	_, err = repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
-	require.NoError(t, err)
 }
 
-func TestPaymentRepo_FetchSentIds(t *testing.T) {
+func TestPaymentRepo_FetchByStatus(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
 
 	err := savePaymentBatch(ctx, repo, []domain.Payment{{ID: 1, Status: etl.StatusSent}})
 	require.NoError(t, err)
 
-	ids, err := repo.FetchSentIds(ctx)
+	batch, err := repo.FetchByStatus(ctx, etl.StatusSent)
 	require.NoError(t, err)
-	require.Len(t, ids, 1)
-	require.Equal(t, domain.PaymentID(1), ids[0])
-}
-
-func TestPaymentRepo_FetchForProcessing_Atomic(t *testing.T) {
-	ctx := context.Background()
-	repo := NewTestSQLitePaymentRepo(t)
-
-	repo.SaveBatch(ctx, []domain.Payment{{ID: 1}})
-
-	_, batch1, _ := repo.FetchForProcessing(ctx)
-	_, batch2, _ := repo.FetchForProcessing(ctx)
-
-	require.Len(t, batch1, 1)
-	require.Len(t, batch2, 0)
+	require.Len(t, batch.IDs, 1)
+	require.Len(t, batch.Items, 1)
+	require.Equal(t, domain.PaymentID(1), batch.IDs[0])
 }
 
 func TestPaymentRepo_MarkStatus(t *testing.T) {

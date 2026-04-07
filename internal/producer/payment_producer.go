@@ -58,7 +58,7 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 	}
 	if len(response) == 0 {
 		p.logger.Warn("all payments invalid")
-		return []domain.Payment{}, err
+		return []domain.Payment{}, nil
 	}
 
 	p.logger.Info("payments fetched successfully", "count", len(response))

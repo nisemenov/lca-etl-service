@@ -60,7 +60,7 @@ func (y *yooPaymentProducer) Fetch(ctx context.Context) ([]domain.YooPayment, er
 	}
 	if len(response) == 0 {
 		y.logger.Warn("all yookassa payments invalid")
-		return []domain.YooPayment{}, err
+		return []domain.YooPayment{}, nil
 	}
 
 	y.logger.Info("yookassa payments fetched successfully", "count", len(response))

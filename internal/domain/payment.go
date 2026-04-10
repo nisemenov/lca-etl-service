@@ -26,7 +26,9 @@ type Payment struct {
 	ExecutionDateBySystem time.Time `validate:"required"`
 	Channel               string    `validate:"required"`
 
-	Status    etl.EtlStatus
+	Status  etl.EtlStatus
+	BatchID *string
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

@@ -15,7 +15,7 @@ type etlPipeline[ID comparable, D any] struct {
 	logger   *slog.Logger
 }
 
-func (etl *etlPipeline[D, ID]) Run(ctx context.Context) error {
+func (etl *etlPipeline[ID, D]) Run(ctx context.Context) error {
 	if err := etl.fetch(ctx); err != nil {
 		etl.logger.Error("fetch stage failed", "err", err)
 		return err
@@ -34,7 +34,7 @@ func (etl *etlPipeline[D, ID]) Run(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipeline[D, ID]) fetch(ctx context.Context) error {
+func (etl *etlPipeline[ID, D]) fetch(ctx context.Context) error {
 	instances, err := etl.producer.Fetch(ctx)
 	if err != nil {
 		return fmt.Errorf("producer fetch failed: %w", err)
@@ -52,25 +52,31 @@ func (etl *etlPipeline[D, ID]) fetch(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipeline[D, ID]) process(ctx context.Context) error {
+// process stage provides at-least-once delivery semantics.
+//
+// Failure scenarios:
+//
+// 1. If failure happens BEFORE InsertBatch:
+//   - data is not written to the consumer
+//   - safe to retry (no duplicates)
+//
+// 2. If failure happens AFTER InsertBatch but BEFORE MarkStatus(StatusSent):
+//   - data may already be written to the consumer
+//   - retry will cause duplicate processing
+//
+// Therefore, retries MUST be idempotent on the consumer side.
+func (etl *etlPipeline[ID, D]) process(ctx context.Context) error {
 	batch, err := etl.repo.FetchForProcessing(ctx)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}
 
-	if len(batch.Items) == 0 {
+	if batch == nil {
 		etl.logger.Info("no instances for processing")
 		return nil
 	}
 
-	// TODO: TTL for StatusProcessing instances
-
 	if err := etl.consumer.InsertBatch(ctx, batch.Items); err != nil {
-		if err2 := etl.repo.MarkStatus(ctx, batch.IDs, StatusFailed); err2 != nil {
-			etl.logger.Error("failed to mark instances as failed", "err", err2)
-		} else {
-			etl.logger.Warn("batch marked as failed", "ids", batch.IDs)
-		}
 		return fmt.Errorf("clickhouse insert failed: %w", err)
 	}
 
@@ -82,7 +88,7 @@ func (etl *etlPipeline[D, ID]) process(ctx context.Context) error {
 	return nil
 }
 
-func (etl *etlPipeline[D, ID]) acknowledge(ctx context.Context) error {
+func (etl *etlPipeline[ID, D]) acknowledge(ctx context.Context) error {
 	batch, err := etl.repo.FetchByStatus(ctx, StatusSent)
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)

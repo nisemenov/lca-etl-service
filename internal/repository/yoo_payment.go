@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/nisemenov/etl_service/internal/domain"
 	"github.com/nisemenov/etl_service/internal/etl"
 )
@@ -44,8 +45,9 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 			yoo_created_at,
 			execution_date_by_system,
 			description,
-			status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status,
+			batch_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO NOTHING
 	`)
 	if err != nil {
@@ -53,7 +55,9 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 	}
 	defer stmt.Close()
 
-	var inserted int64
+	inserted := int64(0)
+	batchID := uuid.NewString()
+
 	for _, yoo := range batch {
 		res, err := stmt.ExecContext(ctx,
 			yoo.ID,
@@ -69,6 +73,7 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 			yoo.ExecutionDateBySystem,
 			yoo.Description,
 			etl.StatusNew,
+			batchID,
 		)
 		if err != nil {
 			return fmt.Errorf("insert yookassa payment %d: %w", yoo.ID, err)
@@ -243,8 +248,7 @@ func (r *sqliteYooPaymentRepo) fetchYooPaymentsOnStatus(
 			execution_date_by_system,
 			description,
 			status,
-			created_at,
-			updated_at
+			batch_id
         FROM yookassa
         WHERE status = ?
 	`, status)
@@ -274,8 +278,7 @@ func scanYooPayments(rows *sql.Rows) ([]domain.YooPayment, error) {
 			&yoo.ExecutionDateBySystem,
 			&yoo.Description,
 			&yoo.Status,
-			&yoo.CreatedAt,
-			&yoo.UpdatedAt,
+			&yoo.BatchID,
 		)
 		if err != nil {
 			return nil, err

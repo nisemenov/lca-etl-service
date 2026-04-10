@@ -62,7 +62,7 @@ func TestETL_Process_OK(t *testing.T) {
 }
 
 func TestETL_Process_CH_Error(t *testing.T) {
-	repo := &mockRepo{batch: []string{"test_batch"}, newIds: []int{1}}
+	repo := &mockRepo{batch: []string{"test_batch"}, newIds: []int{1}, etlStatus: StatusNew}
 	consumer := &mockConsumer{err: errors.New("CH error")}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
@@ -70,7 +70,7 @@ func TestETL_Process_CH_Error(t *testing.T) {
 
 	err := etl.process(context.Background())
 	require.Error(t, err)
-	require.Equal(t, StatusFailed, repo.etlStatus)
+	require.Equal(t, StatusProcessing, repo.etlStatus)
 }
 
 func TestAcknowledge_OK(t *testing.T) {

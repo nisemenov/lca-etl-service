@@ -59,8 +59,9 @@ func savePaymentBatch(ctx context.Context, repo *sqlitePaymentRepo, batch []doma
 			debt_amount,
 			execution_date_by_system,
 			channel,
-			status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status,
+			batch_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -80,6 +81,7 @@ func savePaymentBatch(ctx context.Context, repo *sqlitePaymentRepo, batch []doma
 			p.ExecutionDateBySystem,
 			p.Channel,
 			p.Status,
+			p.BatchID,
 		)
 		if err != nil {
 			return err

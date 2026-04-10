@@ -33,6 +33,7 @@ func (r *mockRepo) SaveBatch(ctx context.Context, batch []string) error {
 }
 
 func (r *mockRepo) FetchForProcessing(ctx context.Context) (*Batch[int, string], error) {
+	r.etlStatus = StatusProcessing
 	return &Batch[int, string]{r.newIds, r.batch}, r.err
 }
 

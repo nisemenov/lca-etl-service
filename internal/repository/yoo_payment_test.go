@@ -27,6 +27,7 @@ func TestYooPaymentRepo_SaveBatch(t *testing.T) {
 	require.Len(t, payments, 1)
 	require.Equal(t, domain.YooPaymentID(1), payments[0].ID)
 	require.Equal(t, etl.StatusNew, payments[0].Status)
+	require.NotEqual(t, "", payments[0].BatchID)
 }
 
 func TestYooPaymentRepo_SaveBatch_Empty(t *testing.T) {

@@ -7,5 +7,4 @@ const (
 	StatusProcessing EtlStatus = "processing"
 	StatusSent       EtlStatus = "sent"
 	StatusExported   EtlStatus = "exported"
-	StatusFailed     EtlStatus = "failed"
 )

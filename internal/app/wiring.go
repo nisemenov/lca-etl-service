@@ -33,7 +33,7 @@ func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker
 		cfg.APIBaseURL,
 		logger.With("component", "httpclient"),
 		httpclient.WithHeaders(
-			map[string]string{"Authorization": cfg.AuthToken},
+			map[string]string{"X-Internal-Token": cfg.XInternalToken},
 		),
 	)
 	chClient := httpclient.NewHTTPClient(

@@ -6,7 +6,7 @@ services:
     environment:
       - DB_PATH=${DB_PATH}
       - API_BASE_URL=${API_BASE_URL}
-      - AUTH_TOKEN=${AUTH_TOKEN}
+      - X_INTERNAL_TOKEN=${X_INTERNAL_TOKEN}
       - HTTP_ADDR=${HTTP_ADDR}
 
       - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}

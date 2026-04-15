@@ -20,10 +20,10 @@ import (
 )
 
 type Config struct {
-	DBPath     string `validate:"required"`
-	APIBaseURL string `validate:"required"`
-	AuthToken  string `validate:"required"`
-	HTTPAddr   string `validate:"required"`
+	DBPath         string `validate:"required"`
+	APIBaseURL     string `validate:"required"`
+	XInternalToken string `validate:"required"`
+	HTTPAddr       string `validate:"required"`
 
 	ClickHouseHost     string `validate:"required"`
 	ClickHousePort     string `validate:"required"`
@@ -43,7 +43,7 @@ func Load() *Config {
 	config := &Config{
 		DBPath:                getEnv("DB_PATH", ""),
 		APIBaseURL:            getEnv("API_BASE_URL", ""),
-		AuthToken:             getEnv("AUTH_TOKEN", ""),
+		XInternalToken:        getEnv("X_INTERNAL_TOKEN", ""),
 		HTTPAddr:              getEnv("HTTP_ADDR", ""),
 		ClickHouseHost:        getEnv("CLICKHOUSE_HOST", ""),
 		ClickHousePort:        getEnv("CLICKHOUSE_PORT", ""),

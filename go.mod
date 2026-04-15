@@ -1,6 +1,6 @@
 module github.com/nisemenov/etl_service
 
-go 1.26.1
+go 1.26.2
 
 require (
 	github.com/go-playground/validator/v10 v10.30.1

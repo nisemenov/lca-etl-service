@@ -1,15 +1,14 @@
 stages:
   - deploy
 
-variables:
-  DOCKER_BUILDKIT: "1"
-  GIT_SSL_NO_VERIFY: "true"
-
 deploy:
   stage: deploy
-  image: docker:latest
+  image: docker:29.4-cli
   before_script:
-    - apk add --no-cache docker-compose
+    # из-за TLS: unspecified error при fetching APKINDEX
+    - echo "https://mirrors.aliyun.com/alpine/v3.23/main" > /etc/apk/repositories
+    - echo "https://mirrors.aliyun.com/alpine/v3.23/community" >> /etc/apk/repositories
+    - apk add --no-cache docker-cli-compose
   script:
     - docker compose -f docker-compose.yml down --remove-orphans
     - docker compose -f docker-compose.yml up -d --build

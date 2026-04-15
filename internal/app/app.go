@@ -10,12 +10,14 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/nisemenov/etl_service/internal/config"
+	"github.com/nisemenov/etl_service/internal/handler"
 	"github.com/nisemenov/etl_service/internal/storage/sqlite"
 	"github.com/nisemenov/etl_service/internal/worker"
 )
@@ -57,14 +59,28 @@ func (a *App) Run() {
 		go w.Run(ctx)
 	}
 
+	// HTTP server
+	srv := handler.NewHTTPServer(a.cfg, a.logger)
+
+	go func() {
+		a.logger.Info("server started", "addr", a.cfg.HTTPAddr)
+
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			a.logger.Error("http server failed", "err", err)
+			stop()
+		}
+	}()
+
 	<-ctx.Done()
 
-	a.logger.Info(
-		"shutdown signal received",
-		"ctx cause", context.Cause(ctx),
-	)
+	a.logger.Info("shutdown signal received", "ctx cause", context.Cause(ctx))
 
-	time.Sleep(200 * time.Millisecond)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		a.logger.Error("http shutdown failed", "err", err)
+	}
 
 	a.logger.Info("application stopped")
 }

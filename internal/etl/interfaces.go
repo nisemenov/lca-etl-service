@@ -5,8 +5,8 @@ import (
 )
 
 type Batch[ID comparable, D any] struct {
-	IDs   []ID
-	Items []D
+	IDs     []ID
+	Items   []D
 }
 
 type Producer[ID comparable, D any] interface {

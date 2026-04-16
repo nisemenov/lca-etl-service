@@ -5,26 +5,23 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/nisemenov/etl-service/internal/domain"
 	"github.com/nisemenov/etl-service/internal/etl"
 )
 
-const staleProcessingTTL = 5 * time.Minute
+const staleProcessingTTL = 10 * time.Minute
 
 type sqlitePaymentRepo struct {
 	db     *sql.DB
 	logger *slog.Logger
 }
 
-// SaveBatch inserts a batch of payments with StatusNew.
-// Assigns a single batch_id to all inserted rows.
+// SaveBatch inserts a new batch of payments with StatusNew.
 // Ignores duplicates by primary key (id).
 func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Payment) error {
 	if len(batch) == 0 {
@@ -34,7 +31,7 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("begin tx failed: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -50,18 +47,16 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 			debt_amount,
 			execution_date_by_system,
 			channel,
-			status,
-			batch_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO NOTHING
 	`)
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare statement failed: %w", err)
 	}
 	defer stmt.Close()
 
 	inserted := int64(0)
-	batchID := uuid.NewString()
 
 	for _, p := range batch {
 		res, err := stmt.ExecContext(ctx,
@@ -76,7 +71,6 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 			p.ExecutionDateBySystem,
 			p.Channel,
 			etl.StatusNew,
-			batchID,
 		)
 		if err != nil {
 			return fmt.Errorf("insert payment %d: %w", p.ID, err)
@@ -88,129 +82,95 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return fmt.Errorf("commit failed: %w", err)
 	}
 
-	r.logger.Info("new payments batch saved successfully", "count", inserted)
+	r.logger.Info("new payments batch saved successfully",
+		"batch count", len(batch),
+		"inserted count", inserted,
+	)
 	return nil
 }
 
 // FetchForProcessing selects payments with StatusNew,
-// marks them as StatusProcessing, and returns them as a batch.
-// Returns nil if no records found.
+// marks them as StatusProcessing in one atomic transaction,
+// and returns them as *etl.Batch.
+// Returns nil, nil if no records found.
 //
-// возвращает батч со status == StatusNew, потому что в CH они не вставляются
+// возвращает батч со status == StatusNew
 func (r *sqlitePaymentRepo) FetchForProcessing(
 	ctx context.Context,
 ) (*etl.Batch[domain.PaymentID, domain.Payment], error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	batch, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew)
-	if err != nil {
-		return nil, err
-	}
-	if batch == nil {
-		r.logger.Info("empty batch for FetchForProcessing")
-		return nil, nil
-	}
-
-	if err := r.markStatusTx(ctx, tx, batch.IDs, etl.StatusProcessing); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	r.logger.Info("payments fetched for processing successfully", "count", len(batch.IDs))
-	return batch, nil
-}
-
-// FetchStaleProcessingByBatch selects one stale processing batch
-// (based on updated_at TTL), refreshes its lease, and returns it.
-// Returns nil if no stale batch found.
-func (r *sqlitePaymentRepo) FetchStaleProcessingByBatch(
-	ctx context.Context,
-) (*etl.Batch[domain.PaymentID, domain.Payment], error) {
-	var batchID string
-
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx failed: %w", err)
 	}
 	defer tx.Rollback()
 
-	err = tx.QueryRowContext(
-		ctx,
-		`
-		SELECT batch_id
-		FROM payments
-		WHERE status = ?
-		  AND batch_id IS NOT NULL
-		  AND updated_at <= datetime('now', ?)
-		GROUP BY batch_id
-		ORDER BY MIN(updated_at)
-		LIMIT 1
-		`, etl.StatusProcessing, fmt.Sprintf("-%d seconds", int(staleProcessingTTL.Seconds())),
-	).Scan(&batchID)
+	batch, err := r.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			r.logger.Info("no stale processing batch")
-			return nil, nil
-		}
-		return nil, fmt.Errorf("select batch_id failed: %w", err)
+		return nil, fmt.Errorf("fetchPaymentsOnStatus failed: %w", err)
+	}
+	if batch == nil || len(batch.IDs) == 0 {
+		r.logger.Info("empty batch for FetchForProcessing")
+		return nil, nil
 	}
 
-	_, err = tx.ExecContext(ctx, `
-		UPDATE payments
-		SET updated_at = CURRENT_TIMESTAMP
-		WHERE batch_id = ?
-		  AND status = ?
-	`, batchID, etl.StatusProcessing)
+	updCount, err := r.markStatusTx(ctx, tx, batch.IDs, etl.StatusProcessing)
 	if err != nil {
-		return nil, fmt.Errorf("update updated_at failed: %w", err)
-	}
-
-	rows, err := tx.QueryContext(ctx, `
-		SELECT 
-			id,
-			case_id,
-			debtor_id,
-			full_name,
-			credit_number,
-            credit_issue_date,
-			amount,
-			debt_amount,
-			execution_date_by_system,
-            channel,
-			status,
-			batch_id,
-			created_at,
-			updated_at
-        FROM payments
-		WHERE batch_id = ?
-		  AND status = ?
-		ORDER BY id
-	`, batchID, etl.StatusProcessing)
-	if err != nil {
-		return nil, fmt.Errorf("select batch rows failed: %w", err)
-	}
-	defer rows.Close()
-
-	batch, err := scanPayments(rows)
-	if err != nil {
-		return nil, fmt.Errorf("rows error: %w", err)
+		return nil, fmt.Errorf("mark StatusProcessing failed: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
+	r.logger.Info("payments fetched for processing successfully",
+		"fetched count", len(batch.IDs),
+		"updated count", updCount,
+	)
 	return batch, nil
+}
+
+// RequeueStaleProcessing finds payments stuck in PROCESSING state longer than TTL
+// and requeues them back to NEW state for reprocessing.
+func (r *sqlitePaymentRepo) RequeueStaleProcessing(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE payments
+		SET status = ?,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE status = ?
+		  AND updated_at <= datetime('now', ?)
+	`,
+		etl.StatusNew,
+		etl.StatusProcessing,
+		fmt.Sprintf("-%d seconds", int(staleProcessingTTL.Seconds())),
+	)
+	if err != nil {
+		return fmt.Errorf("update stale processing payments failed: %w", err)
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected failed: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
+
+	r.logger.Info(
+		"stale processing payments requeued",
+		"count", affected,
+	)
+
+	return nil
 }
 
 // FetchByStatus returns all payments with given status as a batch.
@@ -246,7 +206,7 @@ func (r *sqlitePaymentRepo) MarkStatus(ctx context.Context, ids []domain.Payment
 	}
 	defer tx.Rollback()
 
-	if err := r.markStatusTx(ctx, tx, ids, status); err != nil {
+	if _, err := r.markStatusTx(ctx, tx, ids, status); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -285,15 +245,16 @@ func (r *sqlitePaymentRepo) DeleteExported(ctx context.Context) error {
 	return nil
 }
 
-// markStatusTx updates status for given IDs within a transaction.
+// markStatusTx updates status for given IDs within a transaction and
+// returns count of updated statuses.
 func (r *sqlitePaymentRepo) markStatusTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	ids []domain.PaymentID,
 	status etl.EtlStatus,
-) error {
+) (int, error) {
 	if len(ids) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	placeholders := strings.Repeat("?,", len(ids))
@@ -307,12 +268,18 @@ func (r *sqlitePaymentRepo) markStatusTx(
 
 	query := fmt.Sprintf(`
         UPDATE payments
-        SET status = ?
+        SET status = ?,
+			updated_at = CURRENT_TIMESTAMP
         WHERE id IN (%s)
     `, placeholders)
 
-	_, err := tx.ExecContext(ctx, query, args...)
-	return err
+	res, err := tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("update payment statuses failed: %w", err)
+	} else {
+		affected, _ := res.RowsAffected()
+		return int(affected), nil
+	}
 }
 
 // fetchPaymentsOnStatus selects payments by status within a transaction.
@@ -334,7 +301,6 @@ func (r *sqlitePaymentRepo) fetchPaymentsOnStatus(
 			execution_date_by_system,
 			channel,
 			status,
-			batch_id,
 			created_at,
 			updated_at
 		FROM payments
@@ -356,7 +322,6 @@ func scanPayments(rows *sql.Rows) (*etl.Batch[domain.PaymentID, domain.Payment],
 
 	for rows.Next() {
 		var p domain.Payment
-		var batchID sql.NullString
 
 		err := rows.Scan(
 			&p.ID,
@@ -370,16 +335,11 @@ func scanPayments(rows *sql.Rows) (*etl.Batch[domain.PaymentID, domain.Payment],
 			&p.ExecutionDateBySystem,
 			&p.Channel,
 			&p.Status,
-			&batchID,
 			&p.CreatedAt,
 			&p.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan payment row: %w", err)
-		}
-
-		if batchID.Valid {
-			p.BatchID = new(batchID.String)
 		}
 
 		ids = append(ids, p.ID)

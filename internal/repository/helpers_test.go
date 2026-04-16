@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"io"
 	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/nisemenov/etl-service/internal/domain"
@@ -32,9 +33,9 @@ func NewTestSQLitePaymentRepo(t *testing.T) *sqlitePaymentRepo {
 	t.Helper()
 
 	db := NewTestSQLiteDB(t)
-	// hndlr := os.Stdout
-	hndlr := io.Discard
-	logger := slog.New(slog.NewTextHandler(hndlr, nil))
+	hndlr := os.Stdout
+	// hndlr := io.Discard
+	logger := slog.New(slog.NewTextHandler(hndlr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	repo := NewSQLitePaymentRepo(db, logger)
 	return repo
@@ -59,9 +60,8 @@ func savePaymentBatch(ctx context.Context, repo *sqlitePaymentRepo, batch []doma
 			debt_amount,
 			execution_date_by_system,
 			channel,
-			status,
-			batch_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -81,7 +81,6 @@ func savePaymentBatch(ctx context.Context, repo *sqlitePaymentRepo, batch []doma
 			p.ExecutionDateBySystem,
 			p.Channel,
 			p.Status,
-			p.BatchID,
 		)
 		if err != nil {
 			return err

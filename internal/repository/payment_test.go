@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nisemenov/etl-service/internal/domain"
 	"github.com/nisemenov/etl-service/internal/etl"
@@ -29,7 +28,6 @@ func TestPaymentRepo_SaveBatch(t *testing.T) {
 	require.NotNil(t, batch)
 	require.Equal(t, domain.PaymentID(1), batch.IDs[0])
 	require.Equal(t, etl.StatusNew, batch.Items[0].Status)
-	require.NotNil(t, batch.Items[0].BatchID)
 }
 
 func TestPaymentRepo_SaveBatch_Empty(t *testing.T) {
@@ -53,17 +51,19 @@ func TestPaymentRepo_FetchForProcessing(t *testing.T) {
 	repo := NewTestSQLitePaymentRepo(t)
 
 	savePaymentBatch(ctx, repo, []domain.Payment{{ID: 1, Status: etl.StatusNew}})
+	time.Sleep(time.Duration(500 * time.Millisecond))
 
 	batch, err := repo.FetchForProcessing(ctx)
 	require.NoError(t, err)
+	require.Len(t, batch.Items, 1)
 	require.Len(t, batch.IDs, 1)
 	require.Equal(t, domain.PaymentID(1), batch.IDs[0])
-	require.Len(t, batch.Items, 1)
 
 	tx, _ := repo.db.BeginTx(ctx, nil)
 	batch, err = repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
 	require.NoError(t, err)
 	require.Len(t, batch.Items, 1)
+	require.Greater(t, batch.Items[0].UpdatedAt, batch.Items[0].CreatedAt)
 }
 
 func TestPaymentRepo_FetchByStatus(t *testing.T) {
@@ -85,11 +85,12 @@ func TestPaymentRepo_MarkStatus(t *testing.T) {
 	repo := NewTestSQLitePaymentRepo(t)
 
 	savePaymentBatch(ctx, repo, []domain.Payment{{ID: 1, Status: etl.StatusNew}})
+	time.Sleep(time.Duration(500 * time.Millisecond))
 
 	err := repo.MarkStatus(ctx, []domain.PaymentID{1}, etl.StatusProcessing)
 	require.NoError(t, err)
 
-	tx, err := repo.db.BeginTx(ctx, nil)
+	tx, _ := repo.db.BeginTx(ctx, nil)
 
 	batch, err := repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	require.NoError(t, err)
@@ -98,6 +99,7 @@ func TestPaymentRepo_MarkStatus(t *testing.T) {
 	batch, err = repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusProcessing)
 	require.NoError(t, err)
 	require.Len(t, batch.Items, 1)
+	require.Greater(t, batch.Items[0].UpdatedAt, batch.Items[0].CreatedAt)
 }
 
 func TestPaymentRepo_MarkStatus_Empty(t *testing.T) {
@@ -131,27 +133,34 @@ func TestPaymentRepo_DeleteExported(t *testing.T) {
 	require.Equal(t, domain.PaymentID(2), batch.Items[0].ID)
 }
 
-func TestPyamentRepo_FetchStaleProcessingByBatch(t *testing.T) {
+func TestPyamentRepo_RequeueStaleProcessing(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
 
-	batchID := uuid.NewString()
 	savePaymentBatch(ctx, repo, []domain.Payment{
 		{ID: 1, Status: etl.StatusProcessing},
-		{ID: 2, Status: etl.StatusProcessing, BatchID: &batchID},
-		{ID: 3, Status: etl.StatusProcessing, BatchID: &batchID},
-		{ID: 4, Status: etl.StatusProcessing, BatchID: new("uuid")},
+		{ID: 2, Status: etl.StatusProcessing},
+		{ID: 3, Status: etl.StatusProcessing},
 	})
+
 	tx, err := repo.db.BeginTx(ctx, nil)
+
+	newUpdTime := time.Now().Add(-staleProcessingTTL)
 	tx.ExecContext(ctx, `
-		UPDATE payments SET updated_at = datetime('now', ?)`,
-		fmt.Sprintf("-%d seconds", int(staleProcessingTTL.Seconds())))
+		UPDATE payments
+		SET updated_at = datetime('now', ?)
+		WHERE id IN (1, 2)
+	`, fmt.Sprintf("-%d seconds", int(staleProcessingTTL.Seconds())))
 	tx.Commit()
 	require.NoError(t, err)
 
-	batch, err := repo.FetchStaleProcessingByBatch(ctx)
+	err = repo.RequeueStaleProcessing(ctx)
 	require.NoError(t, err)
-	require.Len(t, batch.Items, 2)
-	require.Equal(t, batchID, *batch.Items[0].BatchID)
-	require.Equal(t, batchID, *batch.Items[1].BatchID)
+
+	tx, _ = repo.db.BeginTx(ctx, nil)
+	batch, err := repo.fetchPaymentsOnStatus(ctx, tx, etl.StatusNew)
+	require.NoError(t, err)
+	require.NotNil(t, batch)
+	require.Equal(t, []domain.PaymentID{1,2}, batch.IDs)
+	require.Greater(t, batch.Items[0].UpdatedAt, newUpdTime)
 }

@@ -1,5 +1,22 @@
 stages:
+  - test
   - deploy
+
+test:
+  stage: test
+  image: golang:1.26.2-alpine3.23
+  variables:
+    GOMODCACHE: "$CI_PROJECT_DIR/.cache/go-mod"
+    GOCACHE: "$CI_PROJECT_DIR/.cache/go-build"
+  cache:
+    paths:
+      - .cache/go-mod
+      - .cache/go-build
+  script:
+    - go mod download
+    - go test -v ./...
+  tags:
+    - etl_service
 
 deploy:
   stage: deploy
@@ -16,4 +33,3 @@ deploy:
     - etl_service
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
-      when: always

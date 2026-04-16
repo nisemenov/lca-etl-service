@@ -75,7 +75,7 @@ func (a *App) Run() {
 
 	a.logger.Info("shutdown signal received", "ctx cause", context.Cause(ctx))
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {

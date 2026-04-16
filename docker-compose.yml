@@ -1,6 +1,6 @@
 services:
   etl:
-    container_name: etl_service
+    container_name: etl-service
     build: .
     restart: unless-stopped
     environment:
@@ -30,7 +30,7 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - /home/user/Dev/etl_service/db:/db
+      - /home/user/Dev/etl-service/db:/db
     networks:
       - etl_service_main
 

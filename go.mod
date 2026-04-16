@@ -1,4 +1,4 @@
-module github.com/nisemenov/etl_service
+module github.com/nisemenov/etl-service
 
 go 1.26.2
 

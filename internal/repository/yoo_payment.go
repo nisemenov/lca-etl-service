@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/nisemenov/etl_service/internal/domain"
-	"github.com/nisemenov/etl_service/internal/etl"
+	"github.com/nisemenov/etl-service/internal/domain"
+	"github.com/nisemenov/etl-service/internal/etl"
 )
 
 type sqliteYooPaymentRepo struct {

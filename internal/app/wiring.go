@@ -14,13 +14,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nisemenov/etl_service/internal/config"
-	"github.com/nisemenov/etl_service/internal/consumer"
-	"github.com/nisemenov/etl_service/internal/etl"
-	"github.com/nisemenov/etl_service/internal/httpclient"
-	"github.com/nisemenov/etl_service/internal/producer"
-	"github.com/nisemenov/etl_service/internal/repository"
-	"github.com/nisemenov/etl_service/internal/worker"
+	"github.com/nisemenov/etl-service/internal/config"
+	"github.com/nisemenov/etl-service/internal/consumer"
+	"github.com/nisemenov/etl-service/internal/etl"
+	"github.com/nisemenov/etl-service/internal/httpclient"
+	"github.com/nisemenov/etl-service/internal/producer"
+	"github.com/nisemenov/etl-service/internal/repository"
+	"github.com/nisemenov/etl-service/internal/worker"
 )
 
 func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker.Worker {

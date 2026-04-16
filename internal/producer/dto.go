@@ -3,8 +3,8 @@ package producer
 import (
 	"time"
 
-	"github.com/nisemenov/etl_service/internal/domain"
-	"github.com/nisemenov/etl_service/internal/validation"
+	"github.com/nisemenov/etl-service/internal/domain"
+	"github.com/nisemenov/etl-service/internal/validation"
 )
 
 type paymentDTO struct {

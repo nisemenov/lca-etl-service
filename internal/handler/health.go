@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nisemenov/etl_service/internal/config"
+	"github.com/nisemenov/etl-service/internal/config"
 )
 
 func NewHTTPServer(cfg *config.Config, logger *slog.Logger) *http.Server {

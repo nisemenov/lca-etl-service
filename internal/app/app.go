@@ -16,10 +16,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nisemenov/etl_service/internal/config"
-	"github.com/nisemenov/etl_service/internal/handler"
-	"github.com/nisemenov/etl_service/internal/storage/sqlite"
-	"github.com/nisemenov/etl_service/internal/worker"
+	"github.com/nisemenov/etl-service/internal/config"
+	"github.com/nisemenov/etl-service/internal/handler"
+	"github.com/nisemenov/etl-service/internal/storage/sqlite"
+	"github.com/nisemenov/etl-service/internal/worker"
 )
 
 type App struct {

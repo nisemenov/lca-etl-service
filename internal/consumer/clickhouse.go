@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nisemenov/etl_service/internal/domain"
-	"github.com/nisemenov/etl_service/internal/httpclient"
+	"github.com/nisemenov/etl-service/internal/domain"
+	"github.com/nisemenov/etl-service/internal/httpclient"
 )
 
 type domType interface {

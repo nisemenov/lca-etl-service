@@ -4,8 +4,8 @@
 package main
 
 import (
-	"github.com/nisemenov/etl_service/internal/app"
-	"github.com/nisemenov/etl_service/internal/config"
+	"github.com/nisemenov/etl-service/internal/app"
+	"github.com/nisemenov/etl-service/internal/config"
 )
 
 func main() {

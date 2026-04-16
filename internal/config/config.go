@@ -16,7 +16,7 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
-	"github.com/nisemenov/etl_service/internal/validation"
+	"github.com/nisemenov/etl-service/internal/validation"
 )
 
 type Config struct {

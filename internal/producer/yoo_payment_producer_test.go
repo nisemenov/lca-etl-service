@@ -10,8 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/nisemenov/etl_service/internal/domain"
-	"github.com/nisemenov/etl_service/internal/httpclient"
+	"github.com/nisemenov/etl-service/internal/domain"
+	"github.com/nisemenov/etl-service/internal/httpclient"
 	"github.com/stretchr/testify/require"
 )
 

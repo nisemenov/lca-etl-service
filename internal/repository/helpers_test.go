@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/nisemenov/etl_service/internal/domain"
-	"github.com/nisemenov/etl_service/internal/storage/sqlite"
+	"github.com/nisemenov/etl-service/internal/domain"
+	"github.com/nisemenov/etl-service/internal/storage/sqlite"
 	"github.com/stretchr/testify/require"
 )
 

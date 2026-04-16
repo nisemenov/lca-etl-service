@@ -3,7 +3,7 @@ package consumer
 import (
 	"encoding/json"
 
-	"github.com/nisemenov/etl_service/internal/domain"
+	"github.com/nisemenov/etl-service/internal/domain"
 )
 
 func PaymentToClickHouseRow(payment domain.Payment) ([]byte, error) {

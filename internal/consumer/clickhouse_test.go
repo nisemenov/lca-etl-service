@@ -48,12 +48,17 @@ func TestClickHousePayment_InsertBatch_OK(t *testing.T) {
 
 	lines := strings.Split(strings.TrimSpace(string(receivedBody)), "\n")
 	require.Len(t, lines, 2)
+	for _, line := range lines {
+		require.True(t, json.Valid([]byte(line)))
+	}
 
 	var r1, r2 map[string]any
 	require.NoError(t, json.Unmarshal([]byte(lines[0]), &r1))
+	require.Equal(t, float64(1), r1["id"])
 	require.Equal(t, "Ivan", r1["full_name"])
 
 	require.NoError(t, json.Unmarshal([]byte(lines[1]), &r2))
+	require.Equal(t, float64(2), r2["id"])
 	require.Equal(t, "Petr", r2["full_name"])
 }
 

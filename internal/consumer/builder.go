@@ -8,6 +8,7 @@ import (
 
 func PaymentToClickHouseRow(payment domain.Payment) ([]byte, error) {
 	row := map[string]any{
+		"id":                       payment.ID,
 		"case_id":                  payment.CaseID,
 		"debtor_id":                payment.DebtorID,
 		"full_name":                payment.FullName,
@@ -23,6 +24,7 @@ func PaymentToClickHouseRow(payment domain.Payment) ([]byte, error) {
 
 func YooPaymentToClickHouseRow(yoo domain.YooPayment) ([]byte, error) {
 	row := map[string]any{
+		"id":                       yoo.ID,
 		"case_id":                  yoo.CaseID,
 		"debtor_id":                yoo.DebtorID,
 		"full_name":                yoo.FullName,

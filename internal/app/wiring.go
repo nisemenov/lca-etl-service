@@ -80,22 +80,31 @@ func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker
 		logger.With("component", "yookassa payment etl"),
 	)
 
-	// job workers
-	cleanupPayWorker := worker.NewWorker(
-		worker.JobFunc(paymentRepo.DeleteExported),
-		24*time.Hour,
-		logger.With("component", "payment delete exported worker"),
-	)
-	cleanupYooPayWorker := worker.NewWorker(
-		worker.JobFunc(yooPaymentRepo.DeleteExported),
-		24*time.Hour,
-		logger.With("component", "yookassa payment delete exported worker"),
-	)
-
 	return []*worker.Worker{
+		// main etl workers
 		worker.NewWorker(paymentEtl, 30*time.Minute, logger.With("component", "payment worker")),
 		worker.NewWorker(yooPaymentEtl, 30*time.Minute, logger.With("component", "yookassa payment worker")),
-		cleanupPayWorker,
-		cleanupYooPayWorker,
+		// requeue job workers
+		worker.NewWorker(
+			worker.JobFunc(paymentRepo.RequeueStaleProcessing),
+			10*time.Minute,
+			logger.With("component", "payment requeue worker"),
+		),
+		worker.NewWorker(
+			worker.JobFunc(yooPaymentRepo.RequeueStaleProcessing),
+			10*time.Minute,
+			logger.With("component", "yookassa payment requeue worker"),
+		),
+		// cleanup job workers
+		worker.NewWorker(
+			worker.JobFunc(paymentRepo.DeleteExported),
+			7*24*time.Hour,
+			logger.With("component", "payment delete exported worker"),
+		),
+		worker.NewWorker(
+			worker.JobFunc(yooPaymentRepo.DeleteExported),
+			7*24*time.Hour,
+			logger.With("component", "yookassa payment delete exported worker"),
+		),
 	}
 }

@@ -63,7 +63,7 @@ func (a *App) Run() {
 	srv := handler.NewHTTPServer(a.cfg, a.logger)
 
 	go func() {
-		a.logger.Info("server started", "addr", a.cfg.HTTPAddr)
+		a.logger.Info("server started", "addr", srv.Addr)
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			a.logger.Error("http server failed", "err", err)

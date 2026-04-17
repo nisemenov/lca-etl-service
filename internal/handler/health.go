@@ -14,7 +14,7 @@ func NewHTTPServer(cfg *config.Config, logger *slog.Logger) *http.Server {
 	mux.HandleFunc("/health", healthHandler)
 
 	return &http.Server{
-		Addr:         cfg.HTTPAddr(),
+		Addr:         "0.0.0.0:8080",
 		Handler:      loggingMiddleware(mux, logger),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,

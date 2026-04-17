@@ -24,8 +24,6 @@ type Config struct {
 	DBPath         string `validate:"required"`
 	APIBaseURL     string `validate:"required"`
 	XInternalToken string `validate:"required"`
-	HTTPHost       string `validate:"required"`
-	HTTPPort       string `validate:"required"`
 
 	ClickHouseHost     string `validate:"required"`
 	ClickHousePort     string `validate:"required"`
@@ -39,10 +37,6 @@ type Config struct {
 	Debug bool
 }
 
-func (c *Config) HTTPAddr() string {
-	return fmt.Sprintf("%s:%s", c.HTTPHost, c.HTTPPort)
-}
-
 func Load() *Config {
 	_ = godotenv.Load()
 
@@ -50,8 +44,6 @@ func Load() *Config {
 		DBPath:                getEnv("DB_PATH", ""),
 		APIBaseURL:            getEnv("API_BASE_URL", ""),
 		XInternalToken:        getEnv("X_INTERNAL_TOKEN", ""),
-		HTTPHost:              getEnv("HTTP_HOST", ""),
-		HTTPPort:              getEnv("HTTP_PORT", ""),
 		ClickHouseHost:        getEnv("CLICKHOUSE_HOST", ""),
 		ClickHousePort:        getEnv("CLICKHOUSE_PORT", ""),
 		ClickHouseUser:        getEnv("CLICKHOUSE_USER", ""),

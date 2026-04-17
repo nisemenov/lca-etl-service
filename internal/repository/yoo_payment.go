@@ -114,9 +114,13 @@ func (r *sqliteYooPaymentRepo) FetchForProcessing(
 		return nil, nil
 	}
 
-	updCount, err := r.markStatusTx(ctx, tx, batch.IDs, etl.StatusProcessing)
-	if err != nil {
-		return nil, fmt.Errorf("mark StatusProcessing failed: %w", err)
+	updCount := 0
+	for _, b := range chunkItems(batch.IDs, SQLParamsLimit) {
+		count, err := r.markStatusTx(ctx, tx, b, etl.StatusProcessing)
+		if err != nil {
+			return nil, fmt.Errorf("mark StatusProcessing failed: %w", err)
+		}
+		updCount += count
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -126,6 +130,7 @@ func (r *sqliteYooPaymentRepo) FetchForProcessing(
 	r.logger.Info("payments fetched for processing successfully",
 		"fetched count", len(batch.IDs),
 		"updated count", updCount,
+		"chunks", len(chunkItems(batch.IDs, SQLParamsLimit)),
 	)
 	return batch, nil
 }
@@ -204,8 +209,10 @@ func (r *sqliteYooPaymentRepo) MarkStatus(ctx context.Context, ids []domain.YooP
 	}
 	defer tx.Rollback()
 
-	if _, err := r.markStatusTx(ctx, tx, ids, status); err != nil {
-		return err
+	for _, b := range chunkItems(ids, SQLParamsLimit) {
+		if _, err := r.markStatusTx(ctx, tx, b, status); err != nil {
+			return fmt.Errorf("mark %s failed: %w", status, err)
+		}
 	}
 	return tx.Commit()
 }

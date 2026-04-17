@@ -38,6 +38,9 @@ func (r *mockRepo) FetchForProcessing(ctx context.Context) (*Batch[int, string],
 }
 
 func (r *mockRepo) FetchByStatus(ctx context.Context, status EtlStatus) (*Batch[int, string], error) {
+	if r.etlStatus == "" {
+		return nil, nil
+	}
 	return &Batch[int, string]{IDs: r.sentIds, Items: nil}, nil
 }
 

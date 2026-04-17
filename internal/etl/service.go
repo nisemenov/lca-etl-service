@@ -93,6 +93,12 @@ func (etl *etlPipeline[ID, D]) acknowledge(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("repository fetch failed: %w", err)
 	}
+
+	if batch == nil {
+		etl.logger.Info("no instances to acknowledge")
+		return nil
+	}
+
 	ids := batch.IDs
 
 	if len(ids) == 0 {

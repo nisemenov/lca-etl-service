@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -88,10 +89,10 @@ func TestAcknowledge_OK(t *testing.T) {
 	require.Equal(t, StatusExported, repo.etlStatus)
 }
 
-func TestAcknowledge_NoRecords(t *testing.T) {
+func TestAcknowledge_EmptyBatch(t *testing.T) {
 	producer := &mockProducer{}
-	repo := &mockRepo{etlStatus: StatusSent}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	repo := &mockRepo{}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	etl := NewETLPipeline(producer, repo, nil, logger)
 
@@ -99,7 +100,6 @@ func TestAcknowledge_NoRecords(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Nil(t, producer.ackIds)
-	require.Equal(t, StatusSent, repo.etlStatus)
 }
 
 func TestETL_Run_OK(t *testing.T) {

@@ -87,23 +87,23 @@ func buildWorkers(cfg *config.Config, logger *slog.Logger, db *sql.DB) []*worker
 		// requeue job workers
 		worker.NewWorker(
 			worker.JobFunc(paymentRepo.RequeueStaleProcessing),
-			10*time.Minute,
+			5*time.Minute,
 			logger.With("component", "payment requeue worker"),
 		),
 		worker.NewWorker(
 			worker.JobFunc(yooPaymentRepo.RequeueStaleProcessing),
-			10*time.Minute,
+			5*time.Minute,
 			logger.With("component", "yookassa payment requeue worker"),
 		),
 		// cleanup job workers
 		worker.NewWorker(
 			worker.JobFunc(paymentRepo.DeleteExported),
-			7*24*time.Hour,
+			24*time.Hour,
 			logger.With("component", "payment delete exported worker"),
 		),
 		worker.NewWorker(
 			worker.JobFunc(yooPaymentRepo.DeleteExported),
-			7*24*time.Hour,
+			24*time.Hour,
 			logger.With("component", "yookassa payment delete exported worker"),
 		),
 	}

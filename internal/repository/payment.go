@@ -14,7 +14,7 @@ import (
 	"github.com/nisemenov/etl-service/internal/etl"
 )
 
-const staleProcessingTTL = 10 * time.Minute
+const staleProcessingTTL = 15 * time.Minute
 
 type sqlitePaymentRepo struct {
 	db     *sql.DB

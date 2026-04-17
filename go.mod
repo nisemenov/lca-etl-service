@@ -4,7 +4,6 @@ go 1.26.2
 
 require (
 	github.com/go-playground/validator/v10 v10.30.1
-	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/pressly/goose/v3 v3.26.0

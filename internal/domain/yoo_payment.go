@@ -25,8 +25,7 @@ type YooPayment struct {
 	ExecutionDateBySystem time.Time    `validate:"required"`
 	Description           string       `validate:"required"`
 
-	Status  etl.EtlStatus
-	BatchID string
+	Status etl.EtlStatus
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

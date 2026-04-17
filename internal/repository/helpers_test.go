@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"io"
 	"log/slog"
 	"os"
 	"testing"
@@ -12,6 +11,10 @@ import (
 	"github.com/nisemenov/etl-service/internal/storage/sqlite"
 	"github.com/stretchr/testify/require"
 )
+
+var hndlr = os.Stdout
+
+// var hndlr := io.Discard
 
 func NewTestSQLiteDB(t *testing.T) *sql.DB {
 	t.Helper()
@@ -33,8 +36,6 @@ func NewTestSQLitePaymentRepo(t *testing.T) *sqlitePaymentRepo {
 	t.Helper()
 
 	db := NewTestSQLiteDB(t)
-	hndlr := os.Stdout
-	// hndlr := io.Discard
 	logger := slog.New(slog.NewTextHandler(hndlr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	repo := NewSQLitePaymentRepo(db, logger)
@@ -94,7 +95,7 @@ func NewTestSQLiteYooPaymentRepo(t *testing.T) *sqliteYooPaymentRepo {
 	t.Helper()
 
 	db := NewTestSQLiteDB(t)
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.NewTextHandler(hndlr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	repo := NewSQLiteYooPaymentRepo(db, logger)
 	return repo

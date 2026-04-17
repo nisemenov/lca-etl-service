@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/nisemenov/etl-service/internal/domain"
 	"github.com/nisemenov/etl-service/internal/etl"
 )
@@ -19,6 +18,8 @@ type sqliteYooPaymentRepo struct {
 	logger *slog.Logger
 }
 
+// SaveBatch inserts a new batch of yoo payments with StatusNew.
+// Ignores duplicates by primary key (id).
 func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.YooPayment) error {
 	if len(batch) == 0 {
 		r.logger.Info("empty batch for SaveBatch")
@@ -45,9 +46,8 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 			yoo_created_at,
 			execution_date_by_system,
 			description,
-			status,
-			batch_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO NOTHING
 	`)
 	if err != nil {
@@ -56,7 +56,6 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 	defer stmt.Close()
 
 	inserted := int64(0)
-	batchID := uuid.NewString()
 
 	for _, yoo := range batch {
 		res, err := stmt.ExecContext(ctx,
@@ -73,7 +72,6 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 			yoo.ExecutionDateBySystem,
 			yoo.Description,
 			etl.StatusNew,
-			batchID,
 		)
 		if err != nil {
 			return fmt.Errorf("insert yookassa payment %d: %w", yoo.ID, err)
@@ -92,44 +90,89 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 	return nil
 }
 
-// FetchForProcessing меняет статусы в бд на StatusProcessing;
-// возвращает батч со status == StatusNew, потому что в CH они не вставляются
+// FetchForProcessing selects payments with StatusNew,
+// marks them as StatusProcessing in one atomic transaction,
+// and returns them as *etl.Batch.
+// Returns nil, nil if no records found.
+//
+// возвращает батч со status == StatusNew
 func (r *sqliteYooPaymentRepo) FetchForProcessing(
 	ctx context.Context,
 ) (*etl.Batch[domain.YooPaymentID, domain.YooPayment], error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{}, err
+		return nil, fmt.Errorf("begin tx failed: %w", err)
 	}
 	defer tx.Rollback()
 
-	payments, err := r.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew)
+	batch, err := r.fetchYooPaymentsOnStatus(ctx, tx, etl.StatusNew)
 	if err != nil {
-		return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{}, err
+		return nil, fmt.Errorf("fetchYooPaymentsOnStatus failed: %w", err)
 	}
-
-	if len(payments) == 0 {
+	if batch == nil || len(batch.IDs) == 0 {
 		r.logger.Info("empty batch for FetchForProcessing")
-		return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{}, nil
+		return nil, nil
 	}
 
-	ids := make([]domain.YooPaymentID, 0, len(payments))
-	for _, p := range payments {
-		ids = append(ids, p.ID)
-	}
-
-	if err := r.markStatusTx(ctx, tx, ids, etl.StatusProcessing); err != nil {
-		return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{}, err
+	updCount, err := r.markStatusTx(ctx, tx, batch.IDs, etl.StatusProcessing)
+	if err != nil {
+		return nil, fmt.Errorf("mark StatusProcessing failed: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{}, err
+		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
-	r.logger.Info("yookassa payments fetched for processing successfully", "count", len(ids))
-	return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{IDs: ids, Items: payments}, nil
+	r.logger.Info("payments fetched for processing successfully",
+		"fetched count", len(batch.IDs),
+		"updated count", updCount,
+	)
+	return batch, nil
 }
 
+// RequeueStaleProcessing finds payments stuck in PROCESSING state longer than TTL
+// and requeues them back to NEW state for reprocessing.
+func (r *sqliteYooPaymentRepo) RequeueStaleProcessing(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE yookassa
+		SET status = ?,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE status = ?
+		  AND updated_at <= datetime('now', ?)
+	`,
+		etl.StatusNew,
+		etl.StatusProcessing,
+		fmt.Sprintf("-%d seconds", int(staleProcessingTTL.Seconds())),
+	)
+	if err != nil {
+		return fmt.Errorf("update stale processing payments failed: %w", err)
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected failed: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
+
+	r.logger.Info(
+		"stale processing payments requeued",
+		"count", affected,
+	)
+
+	return nil
+}
+
+// FetchByStatus returns all payments with given status as a batch.
+// Returns nil if no records found.
 func (r *sqliteYooPaymentRepo) FetchByStatus(
 	ctx context.Context,
 	status etl.EtlStatus,
@@ -140,23 +183,20 @@ func (r *sqliteYooPaymentRepo) FetchByStatus(
 	}
 	defer tx.Rollback()
 
-	instances, err := r.fetchYooPaymentsOnStatus(ctx, tx, status)
+	batch, err := r.fetchYooPaymentsOnStatus(ctx, tx, status)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(instances) == 0 {
-		r.logger.Info(fmt.Sprintf("no yookassa instances with %s found", status))
+	if batch == nil {
+		r.logger.Info("no payment instances found", "status", status)
 		return nil, nil
 	}
 
-	ids := make([]domain.YooPaymentID, 0, len(instances))
-	for _, i := range instances {
-		ids = append(ids, i.ID)
-	}
-	return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{IDs: ids, Items: instances}, nil
+	return batch, nil
 }
 
+// MarkStatus updates status for given yoo payment IDs.
 func (r *sqliteYooPaymentRepo) MarkStatus(ctx context.Context, ids []domain.YooPaymentID, status etl.EtlStatus) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -164,13 +204,13 @@ func (r *sqliteYooPaymentRepo) MarkStatus(ctx context.Context, ids []domain.YooP
 	}
 	defer tx.Rollback()
 
-	if err := r.markStatusTx(ctx, tx, ids, status); err != nil {
+	if _, err := r.markStatusTx(ctx, tx, ids, status); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-// DeleteExported deletes all StatusExported instances created earlier than 7 days
+// DeleteExported removes exported yoo payments older than retention period.
 func (r *sqliteYooPaymentRepo) DeleteExported(ctx context.Context) error {
 	r.logger.Info("starting cleanup of exported yookassa payments")
 
@@ -203,12 +243,18 @@ func (r *sqliteYooPaymentRepo) DeleteExported(ctx context.Context) error {
 	return nil
 }
 
+// markStatusTx updates status for given IDs within a transaction and
+// returns count of updated statuses.
 func (r *sqliteYooPaymentRepo) markStatusTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	ids []domain.YooPaymentID,
 	status etl.EtlStatus,
-) error {
+) (int, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
 	placeholders := strings.Repeat("?,", len(ids))
 	placeholders = placeholders[:len(placeholders)-1]
 
@@ -220,19 +266,26 @@ func (r *sqliteYooPaymentRepo) markStatusTx(
 
 	query := fmt.Sprintf(`
         UPDATE yookassa
-        SET status = ?
+        SET status = ?,
+			updated_at = CURRENT_TIMESTAMP
         WHERE id IN (%s)
     `, placeholders)
 
-	_, err := tx.ExecContext(ctx, query, args...)
-	return err
+	res, err := tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("update payment statuses failed: %w", err)
+	} else {
+		affected, _ := res.RowsAffected()
+		return int(affected), nil
+	}
 }
 
+// fetchYooPaymentsOnStatus selects yoo payments by status within a transaction.
 func (r *sqliteYooPaymentRepo) fetchYooPaymentsOnStatus(
 	ctx context.Context,
 	tx *sql.Tx,
 	status etl.EtlStatus,
-) ([]domain.YooPayment, error) {
+) (*etl.Batch[domain.YooPaymentID, domain.YooPayment], error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT
 			id,
@@ -248,22 +301,28 @@ func (r *sqliteYooPaymentRepo) fetchYooPaymentsOnStatus(
 			execution_date_by_system,
 			description,
 			status,
-			batch_id
+			created_at,
+			updated_at
         FROM yookassa
         WHERE status = ?
 	`, status)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query payments with status %s: %w", status, err)
 	}
 	defer rows.Close()
 
 	return scanYooPayments(rows)
 }
 
-func scanYooPayments(rows *sql.Rows) ([]domain.YooPayment, error) {
-	var yooPayments []domain.YooPayment
+// scanYooPayments scans SQL rows into a Batch.
+// Returns nil if no rows found.
+func scanYooPayments(rows *sql.Rows) (*etl.Batch[domain.YooPaymentID, domain.YooPayment], error) {
+	var ids []domain.YooPaymentID
+	var items []domain.YooPayment
+
 	for rows.Next() {
 		var yoo domain.YooPayment
+
 		err := rows.Scan(
 			&yoo.ID,
 			&yoo.CaseID,
@@ -278,14 +337,26 @@ func scanYooPayments(rows *sql.Rows) ([]domain.YooPayment, error) {
 			&yoo.ExecutionDateBySystem,
 			&yoo.Description,
 			&yoo.Status,
-			&yoo.BatchID,
+			&yoo.CreatedAt,
+			&yoo.UpdatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan payment row: %w", err)
 		}
-		yooPayments = append(yooPayments, yoo)
+
+		ids = append(ids, yoo.ID)
+		items = append(items, yoo)
 	}
-	return yooPayments, rows.Err()
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	if len(items) == 0 {
+		return nil, nil
+	}
+
+	return &etl.Batch[domain.YooPaymentID, domain.YooPayment]{IDs: ids, Items: items}, nil
 }
 
 func NewSQLiteYooPaymentRepo(db *sql.DB, logger *slog.Logger) *sqliteYooPaymentRepo {

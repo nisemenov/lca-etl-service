@@ -27,8 +27,7 @@ func (y *yooPaymentProducer) Fetch(ctx context.Context) ([]domain.YooPayment, er
 		return []domain.YooPayment{}, err
 	}
 	if len(resp.Data) == 0 {
-		y.logger.Info("no new yookassa payments data to export")
-		return []domain.YooPayment{}, nil
+		return nil, nil
 	}
 
 	// fill in output with validated data
@@ -63,7 +62,6 @@ func (y *yooPaymentProducer) Fetch(ctx context.Context) ([]domain.YooPayment, er
 		return []domain.YooPayment{}, nil
 	}
 
-	y.logger.Info("yookassa payments fetched successfully", "count", len(response))
 	return response, nil
 }
 

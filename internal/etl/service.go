@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 )
 
 type etlPipeline[ID comparable, D any] struct {
@@ -16,40 +17,62 @@ type etlPipeline[ID comparable, D any] struct {
 }
 
 func (etl *etlPipeline[ID, D]) Run(ctx context.Context) error {
-	if err := etl.fetch(ctx); err != nil {
-		etl.logger.Error("fetch stage failed", "err", err)
+	start := time.Now()
+
+	fetched, inserted, err := etl.fetch(ctx)
+	if err != nil {
+		etl.logger.Error("etl run failed",
+			"stage", "fetch",
+			"err", err,
+		)
 		return err
 	}
 
-	if err := etl.process(ctx); err != nil {
-		etl.logger.Error("process stage failed", "err", err)
+	processed, err := etl.process(ctx)
+	if err != nil {
+		etl.logger.Error("etl run failed",
+			"stage", "process",
+			"err", err,
+		)
 		return err
 	}
 
-	if err := etl.acknowledge(ctx); err != nil {
-		etl.logger.Error("ack stage failed", "err", err)
+	ack, err := etl.acknowledge(ctx)
+	if err != nil {
+		etl.logger.Error("etl run failed",
+			"stage", "acknowledge",
+			"err", err,
+		)
 		return err
 	}
+
+	etl.logger.Info("etl run completed",
+		"fetched", fetched,
+		"inserted", inserted,
+		"duplicates", fetched-inserted,
+		"processed", processed,
+		"acknowledged", ack,
+		"duration_ms", time.Since(start).Milliseconds(),
+	)
 
 	return nil
 }
 
-func (etl *etlPipeline[ID, D]) fetch(ctx context.Context) error {
+func (etl *etlPipeline[ID, D]) fetch(ctx context.Context) (int, int, error) {
 	instances, err := etl.producer.Fetch(ctx)
 	if err != nil {
-		return fmt.Errorf("producer fetch failed: %w", err)
+		return 0, 0, fmt.Errorf("producer fetch failed: %w", err)
 	}
 	if len(instances) == 0 {
-		etl.logger.Info("no instances fetched from producer")
-		return nil
+		return 0, 0, nil
 	}
 
-	if err := etl.repo.SaveBatch(ctx, instances); err != nil {
-		return fmt.Errorf("repository save failed: %w", err)
+	inserted, err := etl.repo.SaveBatch(ctx, instances)
+	if err != nil {
+		return 0, 0, fmt.Errorf("repository save failed: %w", err)
 	}
 
-	etl.logger.Info("instances fetched and saved", "count", len(instances))
-	return nil
+	return len(instances), inserted, nil
 }
 
 // process stage provides at-least-once delivery semantics.
@@ -65,57 +88,46 @@ func (etl *etlPipeline[ID, D]) fetch(ctx context.Context) error {
 //   - retry will cause duplicate processing
 //
 // Therefore, retries MUST be idempotent on the consumer side.
-func (etl *etlPipeline[ID, D]) process(ctx context.Context) error {
+func (etl *etlPipeline[ID, D]) process(ctx context.Context) (int, error) {
 	batch, err := etl.repo.FetchForProcessing(ctx)
 	if err != nil {
-		return fmt.Errorf("repository fetch failed: %w", err)
+		return 0, fmt.Errorf("repository fetch failed: %w", err)
 	}
 
 	if batch == nil {
-		etl.logger.Info("no instances for processing")
-		return nil
+		return 0, nil
 	}
 
 	if err := etl.consumer.InsertBatch(ctx, batch.Items); err != nil {
-		return fmt.Errorf("clickhouse insert failed: %w", err)
+		return 0, fmt.Errorf("clickhouse insert failed: %w", err)
 	}
 
 	if err := etl.repo.MarkStatus(ctx, batch.IDs, StatusSent); err != nil {
-		return fmt.Errorf("mark sent failed: %w", err)
+		return 0, fmt.Errorf("mark sent failed: %w", err)
 	}
 
-	etl.logger.Info("instances inserted into clickhouse", "count", len(batch.Items))
-	return nil
+	return len(batch.Items), nil
 }
 
-func (etl *etlPipeline[ID, D]) acknowledge(ctx context.Context) error {
+func (etl *etlPipeline[ID, D]) acknowledge(ctx context.Context) (int, error) {
 	batch, err := etl.repo.FetchByStatus(ctx, StatusSent)
 	if err != nil {
-		return fmt.Errorf("repository fetch failed: %w", err)
+		return 0, fmt.Errorf("repository fetch failed: %w", err)
 	}
 
-	if batch == nil {
-		etl.logger.Info("no instances to acknowledge")
-		return nil
+	if batch == nil || len(batch.IDs) == 0 {
+		return 0, nil
 	}
 
-	ids := batch.IDs
-
-	if len(ids) == 0 {
-		etl.logger.Info("no instances to acknowledge")
-		return nil
+	if err := etl.producer.Acknowledge(ctx, batch.IDs); err != nil {
+		return 0, fmt.Errorf("ack failed: %w", err)
 	}
 
-	if err = etl.producer.Acknowledge(ctx, ids); err != nil {
-		return fmt.Errorf("payment acknowledge failed: %w", err)
+	if err := etl.repo.MarkStatus(ctx, batch.IDs, StatusExported); err != nil {
+		return 0, fmt.Errorf("mark exported failed: %w", err)
 	}
 
-	if err := etl.repo.MarkStatus(ctx, ids, StatusExported); err != nil {
-		return fmt.Errorf("mark exported failed: %w", err)
-	}
-
-	etl.logger.Info("payments acknowledged successfully", "count", len(ids))
-	return nil
+	return len(batch.IDs), nil
 }
 
 func NewETLPipeline[ID comparable, D any](

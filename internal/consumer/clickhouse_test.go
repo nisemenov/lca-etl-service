@@ -1,7 +1,6 @@
 package consumer
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -63,13 +62,10 @@ func TestClickHousePayment_InsertBatch_OK(t *testing.T) {
 }
 
 func TestClickHousePayment_InsertBatch_Empty(t *testing.T) {
-	buf := &bytes.Buffer{}
-	logger := slog.New(slog.NewTextHandler(buf, nil))
-	loader := NewClickHouseLoader(nil, "", PaymentToClickHouseRow, logger)
+	loader := NewClickHouseLoader(nil, "", PaymentToClickHouseRow, slog.New(slog.NewTextHandler(os.Stdout, nil)))
 
 	err := loader.InsertBatch(context.Background(), nil)
 	require.NoError(t, err)
-	require.Contains(t, buf.String(), "empty batch for InsertBatch")
 }
 
 func TestClickHousePayment_InsertBatch_HTTPError(t *testing.T) {
@@ -78,12 +74,10 @@ func TestClickHousePayment_InsertBatch_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	httpClient := httpclient.NewHTTPClient(&http.Client{}, server.URL, logger)
 	loader := NewClickHouseLoader(httpClient, "payments", PaymentToClickHouseRow, logger)
 
 	err := loader.InsertBatch(context.Background(), []domain.Payment{{ID: domain.PaymentID(1)}})
 	require.Error(t, err)
-	require.Contains(t, buf.String(), "InsertBatch failed")
 }

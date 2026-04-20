@@ -27,8 +27,7 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 		return []domain.Payment{}, err
 	}
 	if len(resp.Data) == 0 {
-		p.logger.Info("no new payments data to export")
-		return []domain.Payment{}, nil
+		return nil, nil
 	}
 
 	// fill in output with validated data
@@ -61,7 +60,6 @@ func (p *paymentProducer) Fetch(ctx context.Context) ([]domain.Payment, error) {
 		return []domain.Payment{}, nil
 	}
 
-	p.logger.Info("payments fetched successfully", "count", len(response))
 	return response, nil
 }
 

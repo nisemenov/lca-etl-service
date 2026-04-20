@@ -1,13 +1,13 @@
 package producer
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/nisemenov/etl-service/internal/domain"
@@ -117,8 +117,7 @@ func TestYooPaymentProducer_Fetch_EmptyResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	buf := &bytes.Buffer{}
-	logger := slog.New(slog.NewTextHandler(buf, nil))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	http := httpclient.NewHTTPClient(&http.Client{}, server.URL, logger)
 	yooPayProducer := NewYooPaymentProducer(http, logger)
 
@@ -126,7 +125,6 @@ func TestYooPaymentProducer_Fetch_EmptyResponse(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, yooPayments, 0)
-	require.Contains(t, buf.String(), "no new yookassa payments data to export")
 }
 
 func TestYooPaymentProducer_Fetch_InvalidJSON(t *testing.T) {

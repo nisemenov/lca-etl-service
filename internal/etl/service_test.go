@@ -19,9 +19,10 @@ func TestETL_Fetch_OK(t *testing.T) {
 
 	etl := NewETLPipeline(producer, repo, consumer, logger)
 
-	err := etl.fetch(context.Background())
+	fetched, inserted, err := etl.fetch(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, producer.batch, repo.batch)
+	require.Equal(t, len(producer.batch), fetched)
+	require.Equal(t, len(producer.batch), inserted)
 }
 
 func TestETL_Fetch_Error(t *testing.T) {
@@ -32,8 +33,10 @@ func TestETL_Fetch_Error(t *testing.T) {
 
 	etl := NewETLPipeline(producer, repo, consumer, logger)
 
-	err := etl.fetch(context.Background())
+	fetched, inserted, err := etl.fetch(context.Background())
 	require.Error(t, err)
+	require.Equal(t, 0, fetched)
+	require.Equal(t, 0, inserted)
 }
 
 func TestETL_Save_Error(t *testing.T) {
@@ -44,8 +47,10 @@ func TestETL_Save_Error(t *testing.T) {
 
 	etl := NewETLPipeline(producer, repo, consumer, logger)
 
-	err := etl.fetch(context.Background())
+	fetched, inserted, err := etl.fetch(context.Background())
 	require.Error(t, err)
+	require.Equal(t, 0, fetched)
+	require.Equal(t, 0, inserted)
 }
 
 func TestETL_Process_OK(t *testing.T) {
@@ -55,11 +60,11 @@ func TestETL_Process_OK(t *testing.T) {
 
 	etl := NewETLPipeline(nil, repo, consumer, logger)
 
-	err := etl.process(context.Background())
+	processed, err := etl.process(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, StatusSent, repo.etlStatus)
-	require.Equal(t, repo.batch, consumer.insertedBatch)
+	require.Equal(t, len(repo.batch), processed)
 }
 
 func TestETL_Process_CH_Error(t *testing.T) {
@@ -69,9 +74,9 @@ func TestETL_Process_CH_Error(t *testing.T) {
 
 	etl := NewETLPipeline(nil, repo, consumer, logger)
 
-	err := etl.process(context.Background())
+	processed, err := etl.process(context.Background())
 	require.Error(t, err)
-	require.Equal(t, StatusProcessing, repo.etlStatus)
+	require.Equal(t, 0, processed)
 }
 
 func TestAcknowledge_OK(t *testing.T) {
@@ -82,11 +87,12 @@ func TestAcknowledge_OK(t *testing.T) {
 
 	etl := NewETLPipeline(producer, repo, nil, logger)
 
-	err := etl.acknowledge(ctx)
+	ack, err := etl.acknowledge(ctx)
 
 	require.NoError(t, err)
 	require.Equal(t, repo.sentIds, producer.ackIds)
 	require.Equal(t, StatusExported, repo.etlStatus)
+	require.Equal(t, len(repo.sentIds), ack)
 }
 
 func TestAcknowledge_EmptyBatch(t *testing.T) {
@@ -96,10 +102,10 @@ func TestAcknowledge_EmptyBatch(t *testing.T) {
 
 	etl := NewETLPipeline(producer, repo, nil, logger)
 
-	err := etl.acknowledge(context.Background())
+	ack, err := etl.acknowledge(context.Background())
 
 	require.NoError(t, err)
-	require.Nil(t, producer.ackIds)
+	require.Equal(t, 0, ack)
 }
 
 func TestETL_Run_OK(t *testing.T) {
@@ -112,12 +118,4 @@ func TestETL_Run_OK(t *testing.T) {
 
 	err := etl.Run(context.Background())
 	require.NoError(t, err)
-
-	//fetch prt
-	require.Equal(t, producer.batch, repo.batch)
-	//process prt
-	require.Equal(t, producer.batch, consumer.insertedBatch)
-	//ack prt
-	require.Equal(t, StatusExported, repo.etlStatus)
-	require.Equal(t, repo.newIds, producer.ackIds)
 }

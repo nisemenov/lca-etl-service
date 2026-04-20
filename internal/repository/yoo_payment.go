@@ -20,15 +20,14 @@ type sqliteYooPaymentRepo struct {
 
 // SaveBatch inserts a new batch of yoo payments with StatusNew.
 // Ignores duplicates by primary key (id).
-func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.YooPayment) error {
+func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.YooPayment) (int, error) {
 	if len(batch) == 0 {
-		r.logger.Info("empty batch for SaveBatch")
-		return nil
+		return 0, nil
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("begin tx failed: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -51,11 +50,11 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
         ON CONFLICT(id) DO NOTHING
 	`)
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("prepare statement failed: %w", err)
 	}
 	defer stmt.Close()
 
-	inserted := int64(0)
+	inserted := 0
 
 	for _, yoo := range batch {
 		res, err := stmt.ExecContext(ctx,
@@ -74,20 +73,19 @@ func (r *sqliteYooPaymentRepo) SaveBatch(ctx context.Context, batch []domain.Yoo
 			etl.StatusNew,
 		)
 		if err != nil {
-			return fmt.Errorf("insert yookassa payment %d: %w", yoo.ID, err)
+			return 0, fmt.Errorf("insert payment %d: %w", yoo.ID, err)
 		}
 
 		affected, _ := res.RowsAffected()
-		inserted += affected
+		inserted += int(affected)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("commit failed: %w", err)
 	}
 
-	r.logger.Info("new yookassa payments batch saved successfully", "count", inserted)
-	return nil
+	return inserted, nil
 }
 
 // FetchForProcessing selects payments with StatusNew,
@@ -110,7 +108,6 @@ func (r *sqliteYooPaymentRepo) FetchForProcessing(
 		return nil, fmt.Errorf("fetchYooPaymentsOnStatus failed: %w", err)
 	}
 	if batch == nil || len(batch.IDs) == 0 {
-		r.logger.Info("empty batch for FetchForProcessing")
 		return nil, nil
 	}
 
@@ -122,16 +119,17 @@ func (r *sqliteYooPaymentRepo) FetchForProcessing(
 		}
 		updCount += count
 	}
+	if updCount != len(batch.IDs) {
+		return nil, fmt.Errorf(
+			"partial update: expected=%d, updated=%d",
+			len(batch.IDs), updCount,
+		)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
-	r.logger.Info("payments fetched for processing successfully",
-		"fetched count", len(batch.IDs),
-		"updated count", updCount,
-		"chunks", len(chunkItems(batch.IDs, SQLParamsLimit)),
-	)
 	return batch, nil
 }
 
@@ -194,7 +192,6 @@ func (r *sqliteYooPaymentRepo) FetchByStatus(
 	}
 
 	if batch == nil {
-		r.logger.Info("no payment instances found", "status", status)
 		return nil, nil
 	}
 
@@ -243,7 +240,7 @@ func (r *sqliteYooPaymentRepo) DeleteExported(ctx context.Context) error {
 	}
 
 	r.logger.Info(
-		"exported yookassa payments deleted",
+		"exported instances deleted",
 		"count", affected,
 	)
 

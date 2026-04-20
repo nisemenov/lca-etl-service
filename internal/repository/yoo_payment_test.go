@@ -17,8 +17,10 @@ func TestYooPaymentRepo_SaveBatch(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLiteYooPaymentRepo(t)
 
-	err := repo.SaveBatch(ctx, []domain.YooPayment{{ID: 1}})
+	instances := []domain.YooPayment{{ID: 1}}
+	inserted, err := repo.SaveBatch(ctx, instances)
 	require.NoError(t, err)
+	require.Equal(t, len(instances), inserted)
 
 	tx, err := repo.db.BeginTx(ctx, nil)
 	require.NoError(t, err)
@@ -35,8 +37,9 @@ func TestYooPaymentRepo_SaveBatch_Empty(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLiteYooPaymentRepo(t)
 
-	err := repo.SaveBatch(ctx, nil)
+	inserted, err := repo.SaveBatch(ctx, nil)
 	require.NoError(t, err)
+	require.Equal(t, 0, inserted)
 
 	tx, err := repo.db.BeginTx(ctx, nil)
 	require.NoError(t, err)

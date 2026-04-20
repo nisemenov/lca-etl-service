@@ -50,7 +50,6 @@ func (c *clickHouseLoader[T]) InsertBatch(ctx context.Context, batch []T) error 
 
 func (c *clickHouseLoader[T]) insertOnce(ctx context.Context, batch []T) error {
 	if len(batch) == 0 {
-		c.logger.Info("empty batch for InsertBatch")
 		return nil
 	}
 
@@ -81,7 +80,6 @@ func (c *clickHouseLoader[T]) insertOnce(ctx context.Context, batch []T) error {
 		return fmt.Errorf("InsertBatch failed: %w", err)
 	}
 
-	c.logger.Info("batch inserted successfully", "count", len(batch))
 	return nil
 }
 

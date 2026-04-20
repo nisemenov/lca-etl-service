@@ -16,8 +16,10 @@ func TestPaymentRepo_SaveBatch(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
 
-	err := repo.SaveBatch(ctx, []domain.Payment{{ID: 1}})
+	instances := []domain.Payment{{ID: 1}}
+	inserted, err := repo.SaveBatch(ctx, instances)
 	require.NoError(t, err)
+	require.Equal(t, len(instances), inserted)
 
 	tx, err := repo.db.BeginTx(ctx, nil)
 	require.NoError(t, err)
@@ -34,8 +36,9 @@ func TestPaymentRepo_SaveBatch_Empty(t *testing.T) {
 	ctx := context.Background()
 	repo := NewTestSQLitePaymentRepo(t)
 
-	err := repo.SaveBatch(ctx, nil)
+	inserted, err := repo.SaveBatch(ctx, nil)
 	require.NoError(t, err)
+	require.Equal(t, 0, inserted)
 
 	tx, err := repo.db.BeginTx(ctx, nil)
 	require.NoError(t, err)

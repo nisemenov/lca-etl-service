@@ -1,13 +1,13 @@
 package producer
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/nisemenov/etl-service/internal/domain"
@@ -113,8 +113,7 @@ func TestPaymentProducer_Fetch_EmptyResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	buf := &bytes.Buffer{}
-	logger := slog.New(slog.NewTextHandler(buf, nil))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	http := httpclient.NewHTTPClient(&http.Client{}, server.URL, logger)
 	payProducer := NewPaymentProducer(http, logger)
 
@@ -122,7 +121,6 @@ func TestPaymentProducer_Fetch_EmptyResponse(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, payments, 0)
-	require.Contains(t, buf.String(), "no new payments data to export")
 }
 
 func TestPaymentProducer_Fetch_InvalidJSON(t *testing.T) {

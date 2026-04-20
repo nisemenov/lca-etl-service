@@ -23,40 +23,39 @@ type sqlitePaymentRepo struct {
 
 // SaveBatch inserts a new batch of payments with StatusNew.
 // Ignores duplicates by primary key (id).
-func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Payment) error {
+func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Payment) (int, error) {
 	if len(batch) == 0 {
-		r.logger.Info("empty batch for SaveBatch")
-		return nil
+		return 0, nil
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin tx failed: %w", err)
+		return 0, fmt.Errorf("begin tx failed: %w", err)
 	}
 	defer tx.Rollback()
 
 	stmt, err := tx.PrepareContext(ctx, `
         INSERT INTO payments (
             id,
-			case_id,
-			debtor_id,
-			full_name,
-			credit_number,
-			credit_issue_date,
-			amount,
-			debt_amount,
-			execution_date_by_system,
-			channel,
-			status
+            case_id,
+            debtor_id,
+            full_name,
+            credit_number,
+            credit_issue_date,
+            amount,
+            debt_amount,
+            execution_date_by_system,
+            channel,
+            status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO NOTHING
-	`)
+    `)
 	if err != nil {
-		return fmt.Errorf("prepare statement failed: %w", err)
+		return 0, fmt.Errorf("prepare statement failed: %w", err)
 	}
 	defer stmt.Close()
 
-	inserted := int64(0)
+	inserted := 0
 
 	for _, p := range batch {
 		res, err := stmt.ExecContext(ctx,
@@ -73,23 +72,18 @@ func (r *sqlitePaymentRepo) SaveBatch(ctx context.Context, batch []domain.Paymen
 			etl.StatusNew,
 		)
 		if err != nil {
-			return fmt.Errorf("insert payment %d: %w", p.ID, err)
+			return 0, fmt.Errorf("insert payment %d: %w", p.ID, err)
 		}
 
 		affected, _ := res.RowsAffected()
-		inserted += affected
+		inserted += int(affected)
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("commit failed: %w", err)
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit failed: %w", err)
 	}
 
-	r.logger.Info("new payments batch saved successfully",
-		"batch count", len(batch),
-		"inserted count", inserted,
-	)
-	return nil
+	return inserted, nil
 }
 
 // FetchForProcessing selects payments with StatusNew,
@@ -112,7 +106,6 @@ func (r *sqlitePaymentRepo) FetchForProcessing(
 		return nil, fmt.Errorf("fetchPaymentsOnStatus failed: %w", err)
 	}
 	if batch == nil || len(batch.IDs) == 0 {
-		r.logger.Info("empty batch for FetchForProcessing")
 		return nil, nil
 	}
 
@@ -124,16 +117,17 @@ func (r *sqlitePaymentRepo) FetchForProcessing(
 		}
 		updCount += count
 	}
+	if updCount != len(batch.IDs) {
+		return nil, fmt.Errorf(
+			"partial update: expected=%d, updated=%d",
+			len(batch.IDs), updCount,
+		)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
-	r.logger.Info("payments fetched for processing successfully",
-		"fetched count", len(batch.IDs),
-		"updated count", updCount,
-		"chunks", len(chunkItems(batch.IDs, SQLParamsLimit)),
-	)
 	return batch, nil
 }
 
@@ -196,7 +190,6 @@ func (r *sqlitePaymentRepo) FetchByStatus(
 	}
 
 	if batch == nil {
-		r.logger.Info("no payment instances found", "status", status)
 		return nil, nil
 	}
 
@@ -245,7 +238,7 @@ func (r *sqlitePaymentRepo) DeleteExported(ctx context.Context) error {
 	}
 
 	r.logger.Info(
-		"exported payments deleted",
+		"exported instances deleted",
 		"count", affected,
 	)
 

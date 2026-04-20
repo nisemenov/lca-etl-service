@@ -27,9 +27,9 @@ type mockRepo struct {
 	err       error
 }
 
-func (r *mockRepo) SaveBatch(ctx context.Context, batch []string) error {
+func (r *mockRepo) SaveBatch(ctx context.Context, batch []string) (int, error) {
 	r.batch = batch
-	return r.err
+	return len(r.batch), r.err
 }
 
 func (r *mockRepo) FetchForProcessing(ctx context.Context) (*Batch[int, string], error) {
